@@ -72,6 +72,23 @@ cairn serve --config cairn.yaml            # derive the report dir + bind addres
 cairn audit --config cairn.yaml --serve    # audit, then open the dashboard on the result
 ```
 
+Running it directly in a terminal (or via a coding assistant's background-task
+runner) ties its lifetime to that session — close the terminal or end the
+session and the server dies. To keep it running independently on macOS, use a
+`launchd` agent (survives terminal/session closure, restarts on login):
+
+```sh
+# ~/Library/LaunchAgents/org.<you>.cairn-dashboard.plist — RunAtLoad, no KeepAlive
+# (so it's always up, but launchctl stop actually stops it rather than
+# launchd immediately restarting it)
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.<you>.cairn-dashboard.plist
+launchctl stop org.<you>.cairn-dashboard     # stop it manually
+launchctl kickstart gui/$(id -u)/org.<you>.cairn-dashboard   # start it again
+```
+
+On the Pi, a `systemd` unit is the equivalent (`WantedBy=multi-user.target`,
+no `Restart=` if you want the same "stays stopped when you stop it" behavior).
+
 ## Two-tier design
 
 - **Tier 1 (core):** HTTP + HTML parsing only. Runs anywhere the binary runs.
