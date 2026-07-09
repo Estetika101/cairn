@@ -76,3 +76,37 @@ func TestIndexServed(t *testing.T) {
 		t.Errorf("content-type = %q, want text/html", ct)
 	}
 }
+
+// The dashboard shows a live audit and must never be indexed if deployed
+// beyond localhost — every response carries X-Robots-Tag, plus a disallow-all
+// robots.txt for crawlers that ignore headers.
+func TestNoIndexEverywhere(t *testing.T) {
+	srv, err := dashboard.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	for _, path := range []string{"/", "/api/report", "/robots.txt", "/nonexistent"} {
+		resp, err := http.Get(ts.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if got := resp.Header.Get("X-Robots-Tag"); !strings.Contains(got, "noindex") || !strings.Contains(got, "nofollow") {
+			t.Errorf("%s: X-Robots-Tag = %q, want noindex and nofollow", path, got)
+		}
+	}
+
+	resp, err := http.Get(ts.URL + "/robots.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body := make([]byte, 512)
+	n, _ := resp.Body.Read(body)
+	if !strings.Contains(string(body[:n]), "Disallow: /") {
+		t.Errorf("robots.txt = %q, want a disallow-all rule", string(body[:n]))
+	}
+}

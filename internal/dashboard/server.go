@@ -34,11 +34,26 @@ func New(reportDir string) (*Server, error) {
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.FS(sub)))
 	mux.HandleFunc("/api/report", reportHandler(reportDir))
+	mux.HandleFunc("/robots.txt", robotsHandler)
 
 	return &Server{reportDir: reportDir, mux: mux}, nil
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.mux.ServeHTTP(w, r) }
+// ServeHTTP applies noindex/nofollow to every response before dispatching.
+// The dashboard shows a live audit of whatever site it's pointed at; if it's
+// ever exposed beyond localhost (e.g. a playground subdomain), it must never
+// be indexed or crawled by search engines. Belt-and-suspenders: the header
+// covers every response including the JSON API, robots.txt covers crawlers
+// that ignore headers, and the HTML itself carries a <meta robots> tag too.
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-Robots-Tag", "noindex, nofollow, noarchive")
+	s.mux.ServeHTTP(w, r)
+}
+
+func robotsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprint(w, "User-agent: *\nDisallow: /\n")
+}
 
 // ListenAndServe starts the dashboard on addr and blocks until it exits.
 func ListenAndServe(addr, reportDir string) error {

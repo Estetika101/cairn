@@ -1,0 +1,15 @@
+sites:
+  - name: Estetika
+    url: https://estetika.org
+    crawlLimit: 6
+
+checks:
+  security: true
+  links: true
+  seo: true
+
+output:
+  formats: [console, json, markdown, tasks]
+  outDir: ./cairn-report
+
+failOn: error
