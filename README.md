@@ -39,7 +39,10 @@ drops straight into CI.
   "site down."
 - **Sandboxed plugins.** Third-party checks are WebAssembly modules with no
   ambient authority — a plugin reaches the network only through the engine's own
-  polite, budgeted fetch path.
+  polite, budgeted fetch path. Point `plugins:` at a `.wasm` file in config; it
+  runs alongside the built-ins through the identical check interface. A runaway
+  plugin is interrupted and recorded as skipped, never allowed to hang the run.
+  See `plugins/example-x-powered-by/` for a TinyGo example.
 
 ## Two-tier design
 

@@ -12,6 +12,7 @@ import (
 	"github.com/Estetika101/cairn/internal/config"
 	"github.com/Estetika101/cairn/internal/engine"
 	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/cairn/internal/plugin"
 	"github.com/Estetika101/cairn/internal/report"
 )
 
@@ -40,12 +41,28 @@ func run(args []string, stdout, stderr *os.File) int {
 		cfg.Output.OutDir = *outDir
 	}
 
+	ctx := context.Background()
+
 	// Filter built-in checks by config (module or check-ID enable).
 	var enabled []model.Check
 	for _, c := range checks.Builtins() {
 		m := c.Meta()
 		if cfg.CheckEnabled(m.Module, m.ID) {
 			enabled = append(enabled, c)
+		}
+	}
+
+	// Load WASM plugins named in config; they register as ordinary checks.
+	for _, path := range cfg.Plugins {
+		p, perr := plugin.Load(ctx, path)
+		if perr != nil {
+			fmt.Fprintf(stderr, "cairn: %v\n", perr)
+			return 2
+		}
+		defer p.Close(ctx)
+		m := p.Meta()
+		if cfg.CheckEnabled(m.Module, m.ID) {
+			enabled = append(enabled, p)
 		}
 	}
 
@@ -56,7 +73,6 @@ func run(args []string, stdout, stderr *os.File) int {
 	}
 
 	// Sites run sequentially in the slice (siteConcurrency > 1 is future work).
-	ctx := context.Background()
 	for _, site := range cfg.Sites {
 		sr, rerr := engine.RunSite(ctx, cfg.Crawl, engine.SiteTarget{
 			Name:       site.Name,
