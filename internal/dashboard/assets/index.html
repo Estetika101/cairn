@@ -25,11 +25,14 @@
   .site-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
   .site-tabs button { border-radius: 999px; }
   .site-tabs button.active { border-color: var(--info); color: var(--info); }
-  .summary { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-  .badge { border-radius: 8px; padding: 8px 14px; font-family: var(--mono); font-size: 13px; border: 1px solid var(--border); background: var(--panel); }
+  .summary { display: flex; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+  .badge { border-radius: 8px; padding: 8px 14px; font-family: var(--mono); font-size: 13px; border: 1px solid var(--border); background: var(--panel); cursor: pointer; user-select: none; transition: opacity 0.1s; }
+  .badge:hover { border-color: #3a4152; }
+  .badge.off { opacity: 0.4; }
   .badge b { font-size: 16px; }
   .badge.error b { color: var(--error); } .badge.warn b { color: var(--warn); }
   .badge.pass b { color: var(--pass); } .badge.skip b { color: var(--skip); } .badge.info b { color: var(--info); }
+  .shown-count { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
   .filters { display: flex; gap: 16px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
   .filters label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
   .table-scroll { overflow-x: auto; }
@@ -65,6 +68,7 @@
   <div id="app" hidden>
     <div class="site-tabs" id="siteTabs"></div>
     <div class="summary" id="summary"></div>
+    <div class="shown-count" id="shownCount"></div>
     <div class="filters">
       <span>Module:</span>
       <select id="moduleFilter"><option value="">All</option></select>
@@ -141,11 +145,18 @@
 
     var site = report.sites[currentSite];
     var sum = site.summary || {};
+    // Badges are ground-truth totals from the report AND filter toggles: click
+    // one to show/hide that category. They dim when their category is hidden,
+    // so "15 Pass" never silently disagrees with an empty-looking table again.
     summaryEl.innerHTML =
-      badge('error', 'Fail', sum.fail || 0) +
-      badge('pass', 'Pass', sum.pass || 0) +
-      badge('skip', 'Skipped', sum.skipped || 0) +
-      badge('info', 'Info', sum.info || 0);
+      badge('error', 'Fail', sum.fail || 0, showFail) +
+      badge('pass', 'Pass', sum.pass || 0, showPass) +
+      badge('skip', 'Skipped', sum.skipped || 0, showSkipped) +
+      badge('info', 'Info', sum.info || 0, showInfo);
+    Array.prototype.forEach.call(summaryEl.querySelectorAll('.badge'), function (el) {
+      var target = document.getElementById(el.getAttribute('data-toggle'));
+      el.onclick = function () { target.checked = !target.checked; render(); };
+    });
 
     var modules = Array.from(new Set((site.findings || []).map(function (f) { return f.module; }))).sort();
     var prevModule = moduleFilterEl.value;
@@ -156,12 +167,15 @@
     renderRows(site);
   }
 
-  function badge(cls, label, n) {
-    return '<div class="badge ' + cls + '"><b>' + n + '</b> ' + label + '</div>';
+  function badge(cls, label, n, checkboxEl) {
+    var off = checkboxEl && !checkboxEl.checked;
+    return '<div class="badge ' + cls + (off ? ' off' : '') + '" data-toggle="' + checkboxEl.id + '" ' +
+      'title="Click to ' + (off ? 'show' : 'hide') + ' ' + label.toLowerCase() + '"><b>' + n + '</b> ' + label + '</div>';
   }
 
   function renderRows(site) {
     var moduleFilter = moduleFilterEl.value;
+    var total = (site.findings || []).length;
     var findings = (site.findings || []).filter(function (f) {
       if (moduleFilter && f.module !== moduleFilter) return false;
       if (f.status === 'fail') return showFail.checked;
@@ -170,6 +184,10 @@
       if (f.status === 'pass') return showPass.checked;
       return true;
     });
+
+    var hiddenNote = findings.length === total ? '' : ' — click a badge above to reveal a hidden category';
+    document.getElementById('shownCount').textContent =
+      'Showing ' + findings.length + ' of ' + total + ' findings' + hiddenNote;
 
     if (findings.length === 0) {
       rowsEl.innerHTML = '<tr class="empty-row"><td colspan="5">No findings match the current filters.</td></tr>';
@@ -215,8 +233,10 @@
 
   document.getElementById('reload').onclick = load;
   moduleFilterEl.onchange = function () { renderRows(report.sites[currentSite]); };
+  // Full render() (not just renderRows) so badge dimming stays in sync however
+  // a filter changes — via its checkbox directly or via clicking its badge.
   [showFail, showSkipped, showInfo, showPass].forEach(function (el) {
-    el.onchange = function () { renderRows(report.sites[currentSite]); };
+    el.onchange = function () { render(); };
   });
 
   load();
