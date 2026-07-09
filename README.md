@@ -18,11 +18,13 @@ single static Go binary, so it runs anywhere from a Raspberry Pi to a CI runner.
 >
 > Since the slice: the full **SEO module** (16 checks — on-page, social, sitemap,
 > hreflang reciprocity, duplicate-content) landed, and a **local browser
-> dashboard** (`cairn serve`) now renders any report interactively.
+> dashboard** (`cairn serve`) now renders any report interactively — including a
+> **Config tab** to add/remove sites, toggle checks, and trigger a fresh audit
+> without touching YAML by hand.
 >
 > Still to come: GEO / accessibility / structured-data modules, Tier 2
-> (Chromium — Core Web Vitals + rendered a11y), `watch`/`init`, config editing
-> from the dashboard, local run-over-run diff, and multi-site concurrency.
+> (Chromium — Core Web Vitals + rendered a11y), `watch`/`init`, comment-preserving
+> config writes, local run-over-run diff, and multi-site concurrency.
 
 ## Quick start
 
@@ -67,10 +69,20 @@ place data lives: everything it shows is derived from the same JSON the
 console/tasks/markdown formats read.
 
 ```sh
-cairn serve --report ./cairn-report        # view an existing report
-cairn serve --config cairn.yaml            # derive the report dir + bind address from config
-cairn audit --config cairn.yaml --serve    # audit, then open the dashboard on the result
+cairn serve --report ./cairn-report        # view-only: no --config, so editing/triggering is disabled
+cairn serve --config cairn.yaml            # view + a Config tab (sites/checks/output) + "run audit now"
+cairn audit --config cairn.yaml --serve    # audit once, then open the dashboard on the result
 ```
+
+The Config tab's Save writes straight to the config file (merged onto whatever
+else is already there — crawl/tier2/plugins/serve settings not shown in the
+form are left untouched, never blanked out) and validates through the exact
+same rules the CLI enforces on a hand-edited file. **Known gap:** it does not
+yet preserve comments or key order in a hand-written YAML file — saving from
+the form will flatten those. Its config-writing and audit-triggering endpoints
+are localhost-only regardless of `--host`, unless `serve.allowRemoteConfig` is
+explicitly set — viewing a report over the LAN is one risk tier, letting
+anyone on the LAN repoint your crawler is a different, higher one.
 
 Running it directly in a terminal (or via a coding assistant's background-task
 runner) ties its lifetime to that session — close the terminal or end the

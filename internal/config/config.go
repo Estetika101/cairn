@@ -15,54 +15,60 @@ import (
 )
 
 // Config is the parsed cairn.yaml. It is a superset-tolerant view: unknown keys
-// are ignored, absent keys take defaults.
+// are ignored, absent keys take defaults. JSON tags (matching, lowercase
+// camelCase) let the dashboard's config-editing API round-trip this same
+// struct — GET returns it, a form edits a subset, POST merges back onto a
+// freshly loaded copy so untouched sections (crawl/tier2/plugins/serve) are
+// never blanked out (v0.4 §6c).
 type Config struct {
-	Sites         []SiteConfig        `yaml:"sites"`
-	Checks        map[string]bool     `yaml:"checks"` // keys are module names OR check IDs
-	Accessibility AccessibilityConfig `yaml:"accessibility"`
-	FailOn        string              `yaml:"failOn"`
-	Output        OutputConfig        `yaml:"output"`
-	Crawl         model.CrawlConfig   `yaml:"crawl"`
-	Links         LinksConfig         `yaml:"links"`
-	Tier2         Tier2Config         `yaml:"tier2"`
-	Plugins       []string            `yaml:"plugins"`
-	Serve         ServeConfig         `yaml:"serve"`
+	Sites         []SiteConfig        `yaml:"sites" json:"sites"`
+	Checks        map[string]bool     `yaml:"checks" json:"checks"` // keys are module names OR check IDs
+	Accessibility AccessibilityConfig `yaml:"accessibility" json:"accessibility"`
+	FailOn        string              `yaml:"failOn" json:"failOn"`
+	Output        OutputConfig        `yaml:"output" json:"output"`
+	Crawl         model.CrawlConfig   `yaml:"crawl" json:"crawl"`
+	Links         LinksConfig         `yaml:"links" json:"links"`
+	Tier2         Tier2Config         `yaml:"tier2" json:"tier2"`
+	Plugins       []string            `yaml:"plugins" json:"plugins"`
+	Serve         ServeConfig         `yaml:"serve" json:"serve"`
 }
 
 type SiteConfig struct {
-	Name       string `yaml:"name"`
-	URL        string `yaml:"url"`
-	CrawlLimit int    `yaml:"crawlLimit"` // 0 = single page, N = up to N internal pages
+	Name       string `yaml:"name" json:"name"`
+	URL        string `yaml:"url" json:"url"`
+	CrawlLimit int    `yaml:"crawlLimit" json:"crawlLimit"` // 0 = single page, N = up to N internal pages
 }
 
 type AccessibilityConfig struct {
-	WCAGVersion string `yaml:"wcagVersion"`
-	WCAGLevel   string `yaml:"wcagLevel"`
+	WCAGVersion string `yaml:"wcagVersion" json:"wcagVersion"`
+	WCAGLevel   string `yaml:"wcagLevel" json:"wcagLevel"`
 }
 
 type OutputConfig struct {
-	Formats []string `yaml:"formats"`
-	OutDir  string   `yaml:"outDir"`
+	Formats []string `yaml:"formats" json:"formats"`
+	OutDir  string   `yaml:"outDir" json:"outDir"`
 }
 
 type LinksConfig struct {
-	CheckExternal bool `yaml:"checkExternal"`
+	CheckExternal bool `yaml:"checkExternal" json:"checkExternal"`
 }
 
 type Tier2Config struct {
-	Mode       string `yaml:"mode"` // auto | require | off (parsed; unused in the slice)
-	ChromePath string `yaml:"chromePath"`
+	Mode       string `yaml:"mode" json:"mode"` // auto | require | off (parsed; unused in the slice)
+	ChromePath string `yaml:"chromePath" json:"chromePath"`
 }
 
 // ServeConfig governs `cairn serve` / `cairn audit --serve` (v0.4 §6c). Only
 // Host/Port are consumed today; Interval and AllowRemoteConfig are reserved for
-// `cairn watch` and the config-editing web form, not yet built — schema surface
-// for a capability the tool doesn't have yet, same pattern as autoFixable/effort.
+// `cairn watch`, not yet built — schema surface for a capability the tool
+// doesn't have yet, same pattern as autoFixable/effort. AllowRemoteConfig DOES
+// have real teeth now: it gates the dashboard's config-write/audit-trigger
+// endpoints, which stay localhost-only unless this is explicitly true.
 type ServeConfig struct {
-	Host              string `yaml:"host"`
-	Port              int    `yaml:"port"`
-	Interval          string `yaml:"interval"`          // reserved: cairn watch re-audit cadence
-	AllowRemoteConfig bool   `yaml:"allowRemoteConfig"` // reserved: config-editing endpoints
+	Host              string `yaml:"host" json:"host"`
+	Port              int    `yaml:"port" json:"port"`
+	Interval          string `yaml:"interval" json:"interval"`                   // reserved: cairn watch re-audit cadence
+	AllowRemoteConfig bool   `yaml:"allowRemoteConfig" json:"allowRemoteConfig"` // see doc comment above
 }
 
 // Defaults returns a Config populated with v0.4 §4 defaults. Load unmarshals the
@@ -113,6 +119,12 @@ func Parse(data []byte) (*Config, error) {
 	}
 	return &cfg, nil
 }
+
+// Validate re-runs the same checks Parse applies. It's exported so the
+// dashboard's config-editing endpoint (v0.4 §6c) can validate an in-memory
+// struct assembled from a base config merged with form edits, without a
+// round-trip through YAML text — one validator behind both on-ramps.
+func (c *Config) Validate() error { return c.validate() }
 
 func (c *Config) validate() error {
 	if len(c.Sites) == 0 {

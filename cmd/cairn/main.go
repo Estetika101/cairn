@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Estetika101/cairn/internal/checks"
@@ -37,28 +38,12 @@ func run(args []string, stdout, stderr *os.File) int {
 	return runAudit(args, stdout, stderr)
 }
 
-func runAudit(args []string, stdout, stderr *os.File) int {
-	fs := flag.NewFlagSet("cairn audit", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	configPath := fs.String("config", "cairn.yaml", "path to the config file")
-	outDir := fs.String("out", "", "override output.outDir")
-	serve := fs.Bool("serve", false, "after auditing, start the local dashboard on the result")
-	if err := fs.Parse(args); err != nil {
-		return 2
-	}
-
-	cfg, err := config.Load(*configPath)
-	if err != nil {
-		fmt.Fprintln(stderr, err)
-		return 2
-	}
-	if *outDir != "" {
-		cfg.Output.OutDir = *outDir
-	}
-
-	ctx := context.Background()
-
-	// Filter built-in checks by config (module or check-ID enable).
+// runOnce executes one full audit pass against cfg: filters built-in and
+// plugin checks by config, crawls every configured site, and returns the
+// assembled report. Shared between the CLI's own audit run and the
+// dashboard's "run audit now" trigger, so there is exactly one audit
+// execution path, not two that could drift.
+func runOnce(ctx context.Context, cfg *config.Config) (model.Report, error) {
 	var enabled []model.Check
 	for _, c := range checks.Builtins() {
 		m := c.Meta()
@@ -67,12 +52,10 @@ func runAudit(args []string, stdout, stderr *os.File) int {
 		}
 	}
 
-	// Load WASM plugins named in config; they register as ordinary checks.
 	for _, path := range cfg.Plugins {
 		p, perr := plugin.Load(ctx, path)
 		if perr != nil {
-			fmt.Fprintf(stderr, "cairn: %v\n", perr)
-			return 2
+			return model.Report{}, fmt.Errorf("plugin %s: %w", path, perr)
 		}
 		defer p.Close(ctx)
 		m := p.Meta()
@@ -95,10 +78,44 @@ func runAudit(args []string, stdout, stderr *os.File) int {
 			CrawlLimit: site.CrawlLimit,
 		}, enabled, cfg.CheckConfig())
 		if rerr != nil {
-			fmt.Fprintf(stderr, "cairn: %s: %v\n", site.URL, rerr)
-			return 2
+			return model.Report{}, fmt.Errorf("%s: %w", site.URL, rerr)
 		}
 		rep.Sites = append(rep.Sites, sr)
+	}
+	return rep, nil
+}
+
+func runAudit(args []string, stdout, stderr *os.File) int {
+	fs := flag.NewFlagSet("cairn audit", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	configPath := fs.String("config", "cairn.yaml", "path to the config file")
+	outDir := fs.String("out", "", "override output.outDir")
+	serve := fs.Bool("serve", false, "after auditing, start the local dashboard on the result")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	if *outDir != "" {
+		// An explicit --out is a shell-typed flag, resolved relative to the
+		// invoking shell's cwd like any other CLI argument — left as-is.
+		cfg.Output.OutDir = *outDir
+	} else {
+		// A relative outDir that came FROM the config file anchors to the
+		// config file's own directory, not whatever cwd cairn happens to run
+		// from — see resolveOutDir's doc comment.
+		cfg.Output.OutDir = resolveOutDir(*configPath, cfg.Output.OutDir)
+	}
+
+	ctx := context.Background()
+	rep, rerr := runOnce(ctx, cfg)
+	if rerr != nil {
+		fmt.Fprintf(stderr, "cairn: %v\n", rerr)
+		return 2
 	}
 
 	formats := cfg.Output.Formats
@@ -119,7 +136,8 @@ func runAudit(args []string, stdout, stderr *os.File) int {
 
 	addr := fmt.Sprintf("%s:%d", cfg.Serve.Host, cfg.Serve.Port)
 	fmt.Fprintf(stdout, "cairn: exit code would be %d; serving results at http://%s (Ctrl+C to stop)\n", code, addr)
-	if err := dashboard.ListenAndServe(addr, cfg.Output.OutDir); err != nil {
+	opts := dashboardOptions(*configPath, cfg.Output.OutDir, cfg.Serve.AllowRemoteConfig)
+	if err := dashboard.ListenAndServe(addr, opts); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
@@ -135,14 +153,16 @@ func contains(ss []string, s string) bool {
 	return false
 }
 
-// runServe starts the dashboard against an already-written report directory
-// (no audit runs here — `cairn audit --serve` is for that). --report wins if
-// both --config and --report are given; otherwise the directory is derived
-// from --config's output.outDir, defaulting to ./cairn-report.
+// runServe starts the dashboard against an already-written report directory.
+// --report wins if both --config and --report are given; otherwise the
+// directory is derived from --config's output.outDir, defaulting to
+// ./cairn-report. When --config is given, the dashboard also gets a working
+// config editor and "run audit now" trigger (each fresh-loading cfg from
+// configPath, so a saved edit takes effect on the next triggered run).
 func runServe(args []string, stdout, stderr *os.File) int {
 	fs := flag.NewFlagSet("cairn serve", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	configPath := fs.String("config", "", "config file to derive the report directory and bind address from")
+	configPath := fs.String("config", "", "config file to derive the report directory and bind address from, and to enable the config editor + audit trigger")
 	reportDir := fs.String("report", "", "directory containing report.json (default: ./cairn-report, or output.outDir from --config)")
 	host := fs.String("host", "", "bind address (default 127.0.0.1, or serve.host from --config)")
 	port := fs.Int("port", 0, "port (default 8787, or serve.port from --config)")
@@ -152,6 +172,7 @@ func runServe(args []string, stdout, stderr *os.File) int {
 
 	dir := *reportDir
 	bindHost, bindPort := "127.0.0.1", 8787
+	allowRemoteConfig := false
 
 	if *configPath != "" {
 		cfg, err := config.Load(*configPath)
@@ -160,9 +181,10 @@ func runServe(args []string, stdout, stderr *os.File) int {
 			return 2
 		}
 		if dir == "" {
-			dir = cfg.Output.OutDir
+			dir = resolveOutDir(*configPath, cfg.Output.OutDir)
 		}
 		bindHost, bindPort = cfg.Serve.Host, cfg.Serve.Port
+		allowRemoteConfig = cfg.Serve.AllowRemoteConfig
 	}
 	if dir == "" {
 		dir = "./cairn-report"
@@ -175,12 +197,60 @@ func runServe(args []string, stdout, stderr *os.File) int {
 	}
 
 	addr := fmt.Sprintf("%s:%d", bindHost, bindPort)
-	fmt.Fprintf(stdout, "cairn: serving %s at http://%s (Ctrl+C to stop)\n", dir, addr)
-	if err := dashboard.ListenAndServe(addr, dir); err != nil {
+	if *configPath == "" {
+		fmt.Fprintf(stdout, "cairn: serving %s at http://%s (view-only — no --config given, so config editing and the audit trigger are disabled; Ctrl+C to stop)\n", dir, addr)
+	} else {
+		fmt.Fprintf(stdout, "cairn: serving %s at http://%s (Ctrl+C to stop)\n", dir, addr)
+	}
+	opts := dashboardOptions(*configPath, dir, allowRemoteConfig)
+	if err := dashboard.ListenAndServe(addr, opts); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
 	return 0
+}
+
+// dashboardOptions wires the audit-trigger callback to a fresh config.Load +
+// runOnce each time it's invoked, so a config edit saved through the
+// dashboard's editor takes effect on the very next triggered run without
+// restarting the server.
+func dashboardOptions(configPath, reportDir string, allowRemoteConfig bool) dashboard.Options {
+	opts := dashboard.Options{ReportDir: reportDir, AllowRemoteConfig: allowRemoteConfig}
+	if configPath == "" {
+		return opts
+	}
+	opts.ConfigPath = configPath
+	opts.RunAudit = func() error {
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return err
+		}
+		ctx := context.Background()
+		rep, err := runOnce(ctx, cfg)
+		if err != nil {
+			return err
+		}
+		formats := cfg.Output.Formats
+		if !contains(formats, "json") {
+			formats = append(append([]string{}, formats...), "json")
+		}
+		return report.Emit(rep, formats, resolveOutDir(configPath, cfg.Output.OutDir), os.Stdout, false)
+	}
+	return opts
+}
+
+// resolveOutDir anchors a relative output.outDir to the CONFIG FILE'S
+// directory, not the process's current working directory. Without this, a
+// dashboard-triggered audit (cwd is whatever the server happened to start
+// with — invisible to whoever clicked the button in a browser) can silently
+// write its report somewhere other than where the dashboard is reading from,
+// leaving the Report tab stuck showing a stale run forever. An absolute
+// outDir is left untouched.
+func resolveOutDir(configPath, outDir string) string {
+	if filepath.IsAbs(outDir) || configPath == "" {
+		return outDir
+	}
+	return filepath.Join(filepath.Dir(configPath), outDir)
 }
 
 // isTerminal reports whether w is an interactive terminal and color is allowed.

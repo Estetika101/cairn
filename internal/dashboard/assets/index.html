@@ -14,12 +14,21 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
-  header { display: flex; align-items: baseline; gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  header { display: flex; align-items: center; gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
   header h1 { font-family: var(--mono); font-size: 16px; margin: 0; font-weight: 600; letter-spacing: 0.02em; }
   header .meta { color: var(--muted); font-size: 12px; }
   header .spacer { flex: 1; }
-  button, select { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; font-family: var(--sans); }
+  button, select, input[type=text], input[type=number] {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 10px; font-size: 13px; font-family: var(--sans);
+  }
+  button { cursor: pointer; }
   button:hover { border-color: #3a4152; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: var(--info); border-color: var(--info); color: #071018; font-weight: 600; }
+  button.danger-text { background: transparent; border: none; color: var(--error); padding: 4px 8px; }
+  .view-tabs { display: flex; gap: 6px; }
+  .view-tabs button.active { border-color: var(--info); color: var(--info); }
   main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
   #status { color: var(--muted); padding: 40px 0; text-align: center; }
   .site-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -53,6 +62,23 @@
   .detail { color: var(--text); font-size: 13px; }
   .detail .fix { color: var(--muted); display: block; margin-top: 3px; }
   .empty-row td { text-align: center; color: var(--muted); padding: 30px; }
+
+  /* Config view */
+  .config-section { margin-bottom: 28px; }
+  .config-section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; margin: 0 0 10px; }
+  .config-note { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .site-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .site-row input[type=text] { flex: 2; }
+  .site-row input[type=number] { flex: 0 0 90px; }
+  .checks-row, .formats-row { display: flex; gap: 18px; flex-wrap: wrap; }
+  .checks-row label, .formats-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .config-actions { display: flex; gap: 10px; align-items: center; margin-top: 20px; }
+  .config-banner { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; display: none; }
+  .config-banner.error { display: block; background: rgba(242,85,90,0.12); color: var(--error); border: 1px solid rgba(242,85,90,0.3); }
+  .config-banner.ok { display: block; background: rgba(62,207,142,0.12); color: var(--pass); border: 1px solid rgba(62,207,142,0.3); }
+  .field-label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .outdir-row { max-width: 400px; }
+  .outdir-row input { width: 100%; }
 </style>
 </head>
 <body>
@@ -60,9 +86,15 @@
   <h1>cairn</h1>
   <span class="meta" id="meta"></span>
   <div class="spacer"></div>
+  <div class="view-tabs">
+    <button data-view="report" class="active" id="tabReport">Report</button>
+    <button data-view="config" id="tabConfig">Config</button>
+  </div>
   <button id="reload">Reload</button>
 </header>
 <main>
+
+<div id="reportView">
   <div id="status">Loading report…</div>
   <div id="app" hidden>
     <div class="site-tabs" id="siteTabs"></div>
@@ -71,7 +103,8 @@
     <div class="filters">
       <span>Module:</span>
       <select id="moduleFilter"><option value="">All</option></select>
-      <label><input type="checkbox" id="showFail" checked> Errors/Warnings</label>
+      <label><input type="checkbox" id="showErrors" checked> Errors</label>
+      <label><input type="checkbox" id="showWarnings" checked> Warnings</label>
       <label><input type="checkbox" id="showSkipped" checked> Skipped</label>
       <label><input type="checkbox" id="showInfo"> Informational</label>
       <label><input type="checkbox" id="showPass"> Passed</label>
@@ -83,11 +116,70 @@
       </table>
     </div>
   </div>
+</div>
+
+<div id="configView" hidden>
+  <div class="config-banner" id="configBanner"></div>
+  <div id="configUnavailable" hidden>
+    <p>Config editing isn't available in this session — <code>cairn serve</code> was
+    started without <code>--config</code>. Restart it with
+    <code>cairn serve --config your-config.yaml</code> to edit settings and trigger
+    audits from here.</p>
+  </div>
+  <div id="configForm" hidden>
+    <div class="config-section">
+      <h2>Sites to audit</h2>
+      <div id="sitesList"></div>
+      <button id="addSite">+ Add site</button>
+    </div>
+    <div class="config-section">
+      <h2>Checks</h2>
+      <div class="checks-row" id="checksRow">
+        <label><input type="checkbox" data-module="security" checked> security</label>
+        <label><input type="checkbox" data-module="links" checked> links</label>
+        <label><input type="checkbox" data-module="seo" checked> seo</label>
+      </div>
+      <p class="config-note">More modules (GEO, accessibility, structured data) will
+      appear here as they're built.</p>
+    </div>
+    <div class="config-section">
+      <h2>Fail on</h2>
+      <select id="failOn">
+        <option value="off">off — never fail the exit code</option>
+        <option value="warn">warn — fail on any warning or error</option>
+        <option value="error">error — fail only on errors</option>
+      </select>
+    </div>
+    <div class="config-section">
+      <h2>Output</h2>
+      <div class="formats-row" id="formatsRow">
+        <label><input type="checkbox" data-format="console"> console</label>
+        <label><input type="checkbox" data-format="markdown"> markdown</label>
+        <label><input type="checkbox" data-format="json"> json</label>
+        <label><input type="checkbox" data-format="tasks"> tasks</label>
+      </div>
+      <div class="outdir-row" style="margin-top:10px">
+        <label class="field-label">Output directory</label>
+        <input type="text" id="outDir">
+      </div>
+    </div>
+    <div class="config-actions">
+      <button id="saveConfig">Save</button>
+      <button class="primary" id="saveAndRun">Save &amp; run audit</button>
+    </div>
+    <p class="config-note">Saving here rewrites the config file directly — it does
+    not preserve comments or key order in a hand-edited YAML file. Advanced settings
+    (crawl politeness, Tier 2, plugins) aren't shown here yet; they're left exactly
+    as they are on disk.</p>
+  </div>
+</div>
+
 </main>
 <script>
 (function () {
   var report = null;
   var currentSite = 0;
+  var configData = null;
 
   var statusEl = document.getElementById('status');
   var appEl = document.getElementById('app');
@@ -96,10 +188,13 @@
   var summaryEl = document.getElementById('summary');
   var moduleFilterEl = document.getElementById('moduleFilter');
   var rowsEl = document.getElementById('rows');
-  var showFail = document.getElementById('showFail');
+  var showErrors = document.getElementById('showErrors');
+  var showWarnings = document.getElementById('showWarnings');
   var showSkipped = document.getElementById('showSkipped');
   var showInfo = document.getElementById('showInfo');
   var showPass = document.getElementById('showPass');
+
+  // ---------- Report view ----------
 
   function load() {
     statusEl.hidden = false;
@@ -143,21 +238,29 @@
     }
 
     var site = report.sites[currentSite];
+    var findings = site.findings || [];
+    var errorCount = 0, warnCount = 0;
+    findings.forEach(function (f) {
+      if (f.status !== 'fail') return;
+      if (f.severity === 'error') errorCount++; else warnCount++;
+    });
     var sum = site.summary || {};
-    // Badges are ground-truth totals, read-only. They are NOT click targets —
-    // an earlier version made them toggle their checkbox, which reads exactly
-    // like a tab ("click 10 Fail to view fails") but sometimes does the
-    // opposite (turns fails OFF if they were already showing), which is
-    // genuinely unpredictable from the state alone. Checkboxes below are the
-    // one real, unambiguous control; badges just dim to show when a category
-    // they report isn't currently reflected in the table.
+
+    // Badges are ground-truth, read-only counts — not click targets (an
+    // earlier version made them toggle a checkbox, which read like a tab but
+    // sometimes did the opposite of what clicking it implied). They dim when
+    // their category isn't currently reflected in the table below. Error and
+    // Warning are split into separate badges/filters — bundling them as one
+    // "Fail" number reads as "10 failed" when 9 of the 10 are just advisory
+    // warnings, which is exactly backwards from what matters most.
     summaryEl.innerHTML =
-      badge('error', 'Fail', sum.fail || 0, showFail.checked) +
+      badge('error', 'Errors', errorCount, showErrors.checked) +
+      badge('warn', 'Warnings', warnCount, showWarnings.checked) +
       badge('pass', 'Pass', sum.pass || 0, showPass.checked) +
       badge('skip', 'Skipped', sum.skipped || 0, showSkipped.checked) +
       badge('info', 'Info', sum.info || 0, showInfo.checked);
 
-    var modules = Array.from(new Set((site.findings || []).map(function (f) { return f.module; }))).sort();
+    var modules = Array.from(new Set(findings.map(function (f) { return f.module; }))).sort();
     var prevModule = moduleFilterEl.value;
     moduleFilterEl.innerHTML = '<option value="">All modules</option>' +
       modules.map(function (m) { return '<option value="' + esc(m) + '">' + esc(m) + '</option>'; }).join('');
@@ -172,10 +275,11 @@
 
   function renderRows(site) {
     var moduleFilter = moduleFilterEl.value;
-    var total = (site.findings || []).length;
-    var findings = (site.findings || []).filter(function (f) {
+    var all = site.findings || [];
+    var total = all.length;
+    var findings = all.filter(function (f) {
       if (moduleFilter && f.module !== moduleFilter) return false;
-      if (f.status === 'fail') return showFail.checked;
+      if (f.status === 'fail') return f.severity === 'error' ? showErrors.checked : showWarnings.checked;
       if (f.status === 'skipped') return showSkipped.checked;
       if (f.status === 'info') return showInfo.checked;
       if (f.status === 'pass') return showPass.checked;
@@ -228,13 +332,172 @@
     });
   }
 
-  document.getElementById('reload').onclick = load;
+  document.getElementById('reload').onclick = function () {
+    if (currentView === 'config') { loadConfig(); } else { load(); }
+  };
   moduleFilterEl.onchange = function () { renderRows(report.sites[currentSite]); };
   // Full render() (not just renderRows) so badge dimming stays in sync however
-  // a filter changes — via its checkbox directly or via clicking its badge.
-  [showFail, showSkipped, showInfo, showPass].forEach(function (el) {
+  // a filter changes.
+  [showErrors, showWarnings, showSkipped, showInfo, showPass].forEach(function (el) {
     el.onchange = function () { render(); };
   });
+
+  // ---------- Config view ----------
+
+  var configBanner = document.getElementById('configBanner');
+  var configUnavailableEl = document.getElementById('configUnavailable');
+  var configFormEl = document.getElementById('configForm');
+  var sitesListEl = document.getElementById('sitesList');
+  var failOnEl = document.getElementById('failOn');
+  var outDirEl = document.getElementById('outDir');
+
+  function showConfigBanner(kind, text) {
+    configBanner.className = 'config-banner ' + kind;
+    configBanner.textContent = text;
+  }
+  function clearConfigBanner() {
+    configBanner.className = 'config-banner';
+    configBanner.textContent = '';
+  }
+
+  function loadConfig() {
+    clearConfigBanner();
+    fetch('/api/config', { cache: 'no-store' })
+      .then(function (r) {
+        if (r.status === 501) { configUnavailableEl.hidden = false; configFormEl.hidden = true; return null; }
+        if (!r.ok) return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
+        return r.json();
+      })
+      .then(function (data) {
+        if (!data) return;
+        configUnavailableEl.hidden = true;
+        configFormEl.hidden = false;
+        configData = data;
+        renderConfigForm();
+      })
+      .catch(function (err) {
+        showConfigBanner('error', 'Could not load config: ' + err.message);
+      });
+  }
+
+  function renderConfigForm() {
+    sitesListEl.innerHTML = '';
+    (configData.sites || []).forEach(function (site, i) { addSiteRow(site, i); });
+
+    var checks = configData.checks || {};
+    Array.prototype.forEach.call(document.querySelectorAll('#checksRow input[data-module]'), function (el) {
+      var mod = el.getAttribute('data-module');
+      el.checked = checks[mod] !== false; // absent => enabled (matches CheckEnabled default)
+    });
+
+    failOnEl.value = configData.failOn || 'error';
+
+    var formats = (configData.output && configData.output.formats) || [];
+    Array.prototype.forEach.call(document.querySelectorAll('#formatsRow input[data-format]'), function (el) {
+      el.checked = formats.indexOf(el.getAttribute('data-format')) >= 0;
+    });
+    outDirEl.value = (configData.output && configData.output.outDir) || './cairn-report';
+  }
+
+  function addSiteRow(site, index) {
+    var row = document.createElement('div');
+    row.className = 'site-row';
+    row.innerHTML =
+      '<input type="text" placeholder="Name (optional)" class="site-name" value="' + escAttr(site && site.name) + '">' +
+      '<input type="text" placeholder="https://example.com" class="site-url" value="' + escAttr(site && site.url) + '">' +
+      '<input type="number" min="0" placeholder="crawlLimit" class="site-crawl-limit" value="' + (site && site.crawlLimit != null ? site.crawlLimit : 0) + '">' +
+      '<button class="danger-text" title="Remove this site">✕</button>';
+    row.querySelector('button').onclick = function () { row.remove(); };
+    sitesListEl.appendChild(row);
+  }
+
+  document.getElementById('addSite').onclick = function () { addSiteRow({ name: '', url: '', crawlLimit: 0 }); };
+
+  function escAttr(s) {
+    return esc(s || '').replace(/"/g, '&quot;');
+  }
+
+  function collectConfigEdit() {
+    var sites = Array.prototype.map.call(sitesListEl.querySelectorAll('.site-row'), function (row) {
+      return {
+        name: row.querySelector('.site-name').value.trim(),
+        url: row.querySelector('.site-url').value.trim(),
+        crawlLimit: parseInt(row.querySelector('.site-crawl-limit').value, 10) || 0,
+      };
+    });
+    var checks = {};
+    Array.prototype.forEach.call(document.querySelectorAll('#checksRow input[data-module]'), function (el) {
+      checks[el.getAttribute('data-module')] = el.checked;
+    });
+    var formats = Array.prototype.filter.call(document.querySelectorAll('#formatsRow input[data-format]'), function (el) {
+      return el.checked;
+    }).map(function (el) { return el.getAttribute('data-format'); });
+
+    return {
+      sites: sites,
+      checks: checks,
+      failOn: failOnEl.value,
+      output: { formats: formats, outDir: outDirEl.value.trim() },
+    };
+  }
+
+  function saveConfig() {
+    return fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(collectConfigEdit()),
+    }).then(function (r) {
+      if (r.status === 204) { showConfigBanner('ok', 'Saved.'); return true; }
+      return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
+    }).catch(function (err) {
+      showConfigBanner('error', err.message);
+      return false;
+    });
+  }
+
+  document.getElementById('saveConfig').onclick = function () { saveConfig(); };
+
+  document.getElementById('saveAndRun').onclick = function () {
+    var btn = this;
+    btn.disabled = true;
+    showConfigBanner('ok', 'Saving…');
+    saveConfig().then(function (ok) {
+      if (!ok) { btn.disabled = false; return; }
+      showConfigBanner('ok', 'Running audit — this can take a few seconds…');
+      return fetch('/api/audit', { method: 'POST' }).then(function (r) {
+        btn.disabled = false;
+        if (r.status === 204) {
+          showConfigBanner('ok', 'Audit complete.');
+          switchView('report');
+          load();
+          return;
+        }
+        return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
+      });
+    }).catch(function (err) {
+      btn.disabled = false;
+      showConfigBanner('error', err.message);
+    });
+  };
+
+  // ---------- View switching ----------
+
+  var currentView = 'report';
+  var reportViewEl = document.getElementById('reportView');
+  var configViewEl = document.getElementById('configView');
+  var tabReport = document.getElementById('tabReport');
+  var tabConfig = document.getElementById('tabConfig');
+
+  function switchView(view) {
+    currentView = view;
+    reportViewEl.hidden = view !== 'report';
+    configViewEl.hidden = view !== 'config';
+    tabReport.className = view === 'report' ? 'active' : '';
+    tabConfig.className = view === 'config' ? 'active' : '';
+    if (view === 'config' && !configData) loadConfig();
+  }
+  tabReport.onclick = function () { switchView('report'); };
+  tabConfig.onclick = function () { switchView('config'); };
 
   load();
 })();

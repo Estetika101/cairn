@@ -1,15 +1,42 @@
 sites:
-  - name: Estetika
-    url: https://estetika.org
-    crawlLimit: 6
-
+    - name: Estetika
+      url: https://estetika.org
+      crawlLimit: 6
 checks:
-  security: true
-  links: true
-  seo: true
-
-output:
-  formats: [console, json, markdown, tasks]
-  outDir: ./cairn-report
-
+    links: true
+    security: true
+    seo: true
+accessibility:
+    wcagVersion: "2.2"
+    wcagLevel: AA
 failOn: error
+output:
+    formats:
+        - console
+        - markdown
+        - json
+        - tasks
+    outDir: ./cairn-report
+crawl:
+    requestTimeoutMs: 10000
+    userAgent: cairn/0.1 (+https://github.com/Estetika101/cairn)
+    maxRetries: 2
+    retryAfterCapMs: 30000
+    maxConcurrentRequests: 8
+    maxExtraFetches: 500
+    siteConcurrency: 1
+    respectRobots: true
+    perHost:
+        concurrency: 2
+        delayMs: 250
+links:
+    checkExternal: false
+tier2:
+    mode: auto
+    chromePath: ""
+plugins: []
+serve:
+    host: 127.0.0.1
+    port: 8787
+    interval: 15m
+    allowRemoteConfig: false
