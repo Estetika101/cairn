@@ -26,8 +26,7 @@
   .site-tabs button { border-radius: 999px; }
   .site-tabs button.active { border-color: var(--info); color: var(--info); }
   .summary { display: flex; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
-  .badge { border-radius: 8px; padding: 8px 14px; font-family: var(--mono); font-size: 13px; border: 1px solid var(--border); background: var(--panel); cursor: pointer; user-select: none; transition: opacity 0.1s; }
-  .badge:hover { border-color: #3a4152; }
+  .badge { border-radius: 8px; padding: 8px 14px; font-family: var(--mono); font-size: 13px; border: 1px solid var(--border); background: var(--panel); transition: opacity 0.1s; }
   .badge.off { opacity: 0.4; }
   .badge b { font-size: 16px; }
   .badge.error b { color: var(--error); } .badge.warn b { color: var(--warn); }
@@ -145,18 +144,18 @@
 
     var site = report.sites[currentSite];
     var sum = site.summary || {};
-    // Badges are ground-truth totals from the report AND filter toggles: click
-    // one to show/hide that category. They dim when their category is hidden,
-    // so "15 Pass" never silently disagrees with an empty-looking table again.
+    // Badges are ground-truth totals, read-only. They are NOT click targets —
+    // an earlier version made them toggle their checkbox, which reads exactly
+    // like a tab ("click 10 Fail to view fails") but sometimes does the
+    // opposite (turns fails OFF if they were already showing), which is
+    // genuinely unpredictable from the state alone. Checkboxes below are the
+    // one real, unambiguous control; badges just dim to show when a category
+    // they report isn't currently reflected in the table.
     summaryEl.innerHTML =
-      badge('error', 'Fail', sum.fail || 0, showFail) +
-      badge('pass', 'Pass', sum.pass || 0, showPass) +
-      badge('skip', 'Skipped', sum.skipped || 0, showSkipped) +
-      badge('info', 'Info', sum.info || 0, showInfo);
-    Array.prototype.forEach.call(summaryEl.querySelectorAll('.badge'), function (el) {
-      var target = document.getElementById(el.getAttribute('data-toggle'));
-      el.onclick = function () { target.checked = !target.checked; render(); };
-    });
+      badge('error', 'Fail', sum.fail || 0, showFail.checked) +
+      badge('pass', 'Pass', sum.pass || 0, showPass.checked) +
+      badge('skip', 'Skipped', sum.skipped || 0, showSkipped.checked) +
+      badge('info', 'Info', sum.info || 0, showInfo.checked);
 
     var modules = Array.from(new Set((site.findings || []).map(function (f) { return f.module; }))).sort();
     var prevModule = moduleFilterEl.value;
@@ -167,10 +166,8 @@
     renderRows(site);
   }
 
-  function badge(cls, label, n, checkboxEl) {
-    var off = checkboxEl && !checkboxEl.checked;
-    return '<div class="badge ' + cls + (off ? ' off' : '') + '" data-toggle="' + checkboxEl.id + '" ' +
-      'title="Click to ' + (off ? 'show' : 'hide') + ' ' + label.toLowerCase() + '"><b>' + n + '</b> ' + label + '</div>';
+  function badge(cls, label, n, checked) {
+    return '<div class="badge ' + cls + (checked ? '' : ' off') + '"><b>' + n + '</b> ' + label + '</div>';
   }
 
   function renderRows(site) {
@@ -185,7 +182,7 @@
       return true;
     });
 
-    var hiddenNote = findings.length === total ? '' : ' — click a badge above to reveal a hidden category';
+    var hiddenNote = findings.length === total ? '' : ' — check a box below to reveal a hidden category';
     document.getElementById('shownCount').textContent =
       'Showing ' + findings.length + ' of ' + total + ' findings' + hiddenNote;
 
