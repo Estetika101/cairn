@@ -1,0 +1,19 @@
+# Build output
+/cairn
+/dist/
+*.exe
+
+# Audit output
+/cairn-report/
+report.json
+cairn-tasks.md
+
+# Go
+/vendor/
+*.test
+*.out
+coverage.*
+
+# OS / editor
+.DS_Store
+*.swp

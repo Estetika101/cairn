@@ -1,0 +1,40 @@
+# cairn — slice example config (v0.3-s1 walking skeleton)
+# Run: cairn --config slice.yaml
+sites:
+  - name: Example
+    url: https://example.com
+    crawlLimit: 15          # 0 = single page, N = crawl up to N internal pages
+
+checks:
+  security: true
+  links: true
+  # seo-meta-desc-length: false   # example: disable one check without its whole module
+
+accessibility:
+  wcagVersion: "2.2"
+  wcagLevel: "AA"
+
+failOn: error              # off | warn | error
+
+output:
+  formats: [console, markdown, json, tasks]
+  outDir: ./cairn-report
+
+crawl:
+  requestTimeoutMs: 10000
+  userAgent: "cairn/0.1 (+https://github.com/Estetika101/cairn)"
+  maxRetries: 2
+  retryAfterCapMs: 30000
+  maxConcurrentRequests: 8   # GLOBAL in-flight cap across all hosts and sites
+  maxExtraFetches: 500       # PER-SITE ceiling on check-initiated Fetch calls
+  siteConcurrency: 1         # sites audited sequentially by default
+  respectRobots: true
+  perHost:
+    concurrency: 2
+    delayMs: 250
+
+links:
+  checkExternal: false
+
+plugins: []
+  # - ./plugins/example-x-powered-by/x-powered-by.wasm
