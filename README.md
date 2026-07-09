@@ -6,14 +6,20 @@ security headers, broken links, and structured data — with no mandatory API
 keys, no cloud dependency, and no mandatory headless browser. It ships as a
 single static Go binary, so it runs anywhere from a Raspberry Pi to a CI runner.
 
-> **Status: early construction, but runnable.** Cairn is being built from a
-> detailed spec (`webqa-SPEC-v4.md`, canonical) via a vertical-slice "walking
-> skeleton" that proves the load-bearing architecture before module breadth is
-> added. Working today: config, the polite fetch engine, the `security-headers`
-> check, and console/JSON/Markdown/tasks output — so `cairn --config cairn.yaml`
-> already produces a real (security-only) audit of a live site. Still to come:
-> broken-links, the WASM plugin sandbox, then the SEO/GEO/a11y/structured-data
-> modules and Tier 2.
+> **Status: walking skeleton complete; runnable.** Cairn is being built from a
+> detailed spec (`webqa-SPEC-v4.md`, canonical). The first vertical slice — which
+> proves every load-bearing architectural seam at once — is done: the polite
+> fetch engine (per-host politeness, robots, per-run cache, fetch budget), the
+> `security-headers` (page) and `broken-links` (site) checks, content-hash
+> finding IDs, the fail/pass/skipped/info model, console/JSON/Markdown/tasks
+> output with a CI exit gate, and a **sandboxed WebAssembly plugin runtime** with
+> a byte-exact golden test and a 14-case acceptance suite (green under `-race`).
+> So `cairn --config cairn.yaml` produces a real audit of a live site today.
+>
+> Still to come (fill-in against the proven skeleton): the SEO / GEO /
+> accessibility / structured-data modules, Tier 2 (Chromium — Core Web Vitals +
+> rendered a11y), `serve`/`watch`/`init`, local run-over-run diff, and multi-site
+> concurrency.
 
 ## Quick start
 

@@ -60,7 +60,7 @@ func RunSite(ctx context.Context, crawlCfg model.CrawlConfig, target SiteTarget,
 	}
 
 	AssignIDs(findings)
-	sortFindings(findings)
+	SortFindings(findings)
 
 	return model.SiteReport{
 		Name:     target.Name,
@@ -70,9 +70,9 @@ func RunSite(ctx context.Context, crawlCfg model.CrawlConfig, target SiteTarget,
 	}, nil
 }
 
-// sortFindings gives a deterministic order independent of crawl order: by
+// SortFindings gives a deterministic order independent of crawl order: by
 // severity rank (errors first), then module, then ID.
-func sortFindings(fs []model.Finding) {
+func SortFindings(fs []model.Finding) {
 	rank := func(f model.Finding) int {
 		switch f.Severity {
 		case model.SeverityError:
