@@ -16,17 +16,25 @@ single static Go binary, so it runs anywhere from a Raspberry Pi to a CI runner.
 > a byte-exact golden test and a 14-case acceptance suite (green under `-race`).
 > So `cairn --config cairn.yaml` produces a real audit of a live site today.
 >
-> Still to come (fill-in against the proven skeleton): the SEO / GEO /
-> accessibility / structured-data modules, Tier 2 (Chromium — Core Web Vitals +
-> rendered a11y), `serve`/`watch`/`init`, local run-over-run diff, and multi-site
-> concurrency.
+> Since the slice: the full **SEO module** (16 checks — on-page, social, sitemap,
+> hreflang reciprocity, duplicate-content) landed, and a **local browser
+> dashboard** (`cairn serve`) now renders any report interactively.
+>
+> Still to come: GEO / accessibility / structured-data modules, Tier 2
+> (Chromium — Core Web Vitals + rendered a11y), `watch`/`init`, config editing
+> from the dashboard, local run-over-run diff, and multi-site concurrency.
 
 ## Quick start
 
 ```sh
 go build -o cairn ./cmd/cairn
-./cairn --config slice.yaml     # audits the configured site(s)
+./cairn audit --config slice.yaml     # audits the configured site(s)
+./cairn serve --report ./cairn-report # view the results at http://127.0.0.1:8787
 ```
+
+`cairn audit --config x.yaml --serve` does both in one step — audits, then
+immediately opens the dashboard on the result. A bare `cairn --config x.yaml`
+(no verb) is shorthand for `cairn audit --config x.yaml`.
 
 Exit code is non-zero when a finding at or above `failOn` is present, so it
 drops straight into CI.
@@ -49,6 +57,20 @@ drops straight into CI.
   runs alongside the built-ins through the identical check interface. A runaway
   plugin is interrupted and recorded as skipped, never allowed to hang the run.
   See `plugins/example-x-powered-by/` for a TinyGo example.
+
+## Local dashboard
+
+`cairn serve` starts a read-only, localhost-only web UI (`http://127.0.0.1:8787`
+by default) over whatever `report.json` is already on disk — same embedded
+single binary, no database, no external calls. It's a viewer, not a second
+place data lives: everything it shows is derived from the same JSON the
+console/tasks/markdown formats read.
+
+```sh
+cairn serve --report ./cairn-report        # view an existing report
+cairn serve --config cairn.yaml            # derive the report dir + bind address from config
+cairn audit --config cairn.yaml --serve    # audit, then open the dashboard on the result
+```
 
 ## Two-tier design
 

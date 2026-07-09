@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cairn — audit report</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #161922; --border: #262b38; --text: #e6e8ee; --muted: #8b93a7;
+    --error: #f2555a; --warn: #e8a33d; --pass: #3ecf8e; --skip: #6b7280; --info: #5b9dee;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
+  header { display: flex; align-items: baseline; gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  header h1 { font-family: var(--mono); font-size: 16px; margin: 0; font-weight: 600; letter-spacing: 0.02em; }
+  header .meta { color: var(--muted); font-size: 12px; }
+  header .spacer { flex: 1; }
+  button, select { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; font-family: var(--sans); }
+  button:hover { border-color: #3a4152; }
+  main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
+  #status { color: var(--muted); padding: 40px 0; text-align: center; }
+  .site-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  .site-tabs button { border-radius: 999px; }
+  .site-tabs button.active { border-color: var(--info); color: var(--info); }
+  .summary { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .badge { border-radius: 8px; padding: 8px 14px; font-family: var(--mono); font-size: 13px; border: 1px solid var(--border); background: var(--panel); }
+  .badge b { font-size: 16px; }
+  .badge.error b { color: var(--error); } .badge.warn b { color: var(--warn); }
+  .badge.pass b { color: var(--pass); } .badge.skip b { color: var(--skip); } .badge.info b { color: var(--info); }
+  .filters { display: flex; gap: 16px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+  .filters label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; min-width: 640px; border-collapse: collapse; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #1a1e29; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+  .pill.error { background: rgba(242,85,90,0.15); color: var(--error); }
+  .pill.warn { background: rgba(232,163,61,0.15); color: var(--warn); }
+  .pill.pass { background: rgba(62,207,142,0.15); color: var(--pass); }
+  .pill.skipped { background: rgba(107,114,128,0.2); color: var(--skip); }
+  .pill.info { background: rgba(91,157,238,0.15); color: var(--info); }
+  .module { font-family: var(--mono); color: var(--muted); font-size: 12px; }
+  .criterion { font-weight: 500; }
+  .loc { font-family: var(--mono); font-size: 12px; color: var(--muted); word-break: break-all; }
+  .loc a { color: var(--info); text-decoration: none; }
+  .loc a:hover { text-decoration: underline; }
+  .detail { color: var(--text); font-size: 13px; }
+  .detail .fix { color: var(--muted); display: block; margin-top: 3px; }
+  .empty-row td { text-align: center; color: var(--muted); padding: 30px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>cairn</h1>
+  <span class="meta" id="meta"></span>
+  <div class="spacer"></div>
+  <button id="reload">Reload</button>
+</header>
+<main>
+  <div id="status">Loading report…</div>
+  <div id="app" hidden>
+    <div class="site-tabs" id="siteTabs"></div>
+    <div class="summary" id="summary"></div>
+    <div class="filters">
+      <span>Module:</span>
+      <select id="moduleFilter"><option value="">All</option></select>
+      <label><input type="checkbox" id="showFail" checked> Errors/Warnings</label>
+      <label><input type="checkbox" id="showSkipped" checked> Skipped</label>
+      <label><input type="checkbox" id="showInfo"> Informational</label>
+      <label><input type="checkbox" id="showPass"> Passed</label>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Status</th><th>Module</th><th>Criterion</th><th>Location</th><th>Detail</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+<script>
+(function () {
+  var report = null;
+  var currentSite = 0;
+
+  var statusEl = document.getElementById('status');
+  var appEl = document.getElementById('app');
+  var metaEl = document.getElementById('meta');
+  var siteTabsEl = document.getElementById('siteTabs');
+  var summaryEl = document.getElementById('summary');
+  var moduleFilterEl = document.getElementById('moduleFilter');
+  var rowsEl = document.getElementById('rows');
+  var showFail = document.getElementById('showFail');
+  var showSkipped = document.getElementById('showSkipped');
+  var showInfo = document.getElementById('showInfo');
+  var showPass = document.getElementById('showPass');
+
+  function load() {
+    statusEl.hidden = false;
+    statusEl.textContent = 'Loading report…';
+    appEl.hidden = true;
+    fetch('/api/report', { cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
+        return r.json();
+      })
+      .then(function (data) {
+        report = data;
+        currentSite = 0;
+        render();
+      })
+      .catch(function (err) {
+        statusEl.textContent = 'Could not load report: ' + err.message;
+      });
+  }
+
+  function render() {
+    if (!report || !report.sites || report.sites.length === 0) {
+      statusEl.textContent = 'Report has no sites.';
+      return;
+    }
+    statusEl.hidden = true;
+    appEl.hidden = false;
+    metaEl.textContent = (report.tool ? report.tool.name + ' ' + report.tool.version : '') +
+      (report.generatedAt ? '  ·  generated ' + report.generatedAt : '') +
+      (report.schemaVersion ? '  ·  schema ' + report.schemaVersion : '');
+
+    siteTabsEl.innerHTML = '';
+    if (report.sites.length > 1) {
+      report.sites.forEach(function (s, i) {
+        var b = document.createElement('button');
+        b.textContent = s.name || s.url;
+        if (i === currentSite) b.className = 'active';
+        b.onclick = function () { currentSite = i; render(); };
+        siteTabsEl.appendChild(b);
+      });
+    }
+
+    var site = report.sites[currentSite];
+    var sum = site.summary || {};
+    summaryEl.innerHTML =
+      badge('error', 'Fail', sum.fail || 0) +
+      badge('pass', 'Pass', sum.pass || 0) +
+      badge('skip', 'Skipped', sum.skipped || 0) +
+      badge('info', 'Info', sum.info || 0);
+
+    var modules = Array.from(new Set((site.findings || []).map(function (f) { return f.module; }))).sort();
+    var prevModule = moduleFilterEl.value;
+    moduleFilterEl.innerHTML = '<option value="">All modules</option>' +
+      modules.map(function (m) { return '<option value="' + esc(m) + '">' + esc(m) + '</option>'; }).join('');
+    moduleFilterEl.value = modules.indexOf(prevModule) >= 0 ? prevModule : '';
+
+    renderRows(site);
+  }
+
+  function badge(cls, label, n) {
+    return '<div class="badge ' + cls + '"><b>' + n + '</b> ' + label + '</div>';
+  }
+
+  function renderRows(site) {
+    var moduleFilter = moduleFilterEl.value;
+    var findings = (site.findings || []).filter(function (f) {
+      if (moduleFilter && f.module !== moduleFilter) return false;
+      if (f.status === 'fail') return showFail.checked;
+      if (f.status === 'skipped') return showSkipped.checked;
+      if (f.status === 'info') return showInfo.checked;
+      if (f.status === 'pass') return showPass.checked;
+      return true;
+    });
+
+    if (findings.length === 0) {
+      rowsEl.innerHTML = '<tr class="empty-row"><td colspan="5">No findings match the current filters.</td></tr>';
+      return;
+    }
+
+    rowsEl.innerHTML = findings.map(function (f) {
+      var pillClass = f.status === 'fail' ? (f.severity || 'error') : f.status;
+      var pillText = f.status === 'fail' ? (f.severity || 'fail') : f.status;
+      var loc = f.location || {};
+      var locHtml = loc.url ? '<a href="' + esc(loc.url) + '" target="_blank" rel="noopener">' + esc(shorten(loc.url)) + '</a>' : '';
+      if (loc.selector) locHtml += '<br>' + esc(loc.selector);
+      if (loc.affectedUrls && loc.affectedUrls.length) {
+        locHtml += '<br><span style="opacity:.7">+' + loc.affectedUrls.length + ' referrer(s)</span>';
+      }
+      var detail = '';
+      if (f.status === 'skipped') {
+        detail = esc(f.reason || '');
+      } else if (f.status === 'info') {
+        detail = esc(f.observed || '');
+      } else {
+        detail = esc(f.observed || '');
+        if (f.suggestedFix) detail += '<span class="fix">' + esc(f.suggestedFix) + '</span>';
+      }
+      return '<tr>' +
+        '<td><span class="pill ' + pillClass + '">' + esc(pillText) + '</span></td>' +
+        '<td class="module">' + esc(f.module || '') + '</td>' +
+        '<td class="criterion">' + esc(f.criterion || '') + '</td>' +
+        '<td class="loc">' + locHtml + '</td>' +
+        '<td class="detail">' + detail + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function shorten(url) {
+    return url.length > 60 ? url.slice(0, 57) + '…' : url;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  document.getElementById('reload').onclick = load;
+  moduleFilterEl.onchange = function () { renderRows(report.sites[currentSite]); };
+  [showFail, showSkipped, showInfo, showPass].forEach(function (el) {
+    el.onchange = function () { renderRows(report.sites[currentSite]); };
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

@@ -26,6 +26,7 @@ type Config struct {
 	Links         LinksConfig         `yaml:"links"`
 	Tier2         Tier2Config         `yaml:"tier2"`
 	Plugins       []string            `yaml:"plugins"`
+	Serve         ServeConfig         `yaml:"serve"`
 }
 
 type SiteConfig struct {
@@ -53,6 +54,17 @@ type Tier2Config struct {
 	ChromePath string `yaml:"chromePath"`
 }
 
+// ServeConfig governs `cairn serve` / `cairn audit --serve` (v0.4 §6c). Only
+// Host/Port are consumed today; Interval and AllowRemoteConfig are reserved for
+// `cairn watch` and the config-editing web form, not yet built — schema surface
+// for a capability the tool doesn't have yet, same pattern as autoFixable/effort.
+type ServeConfig struct {
+	Host              string `yaml:"host"`
+	Port              int    `yaml:"port"`
+	Interval          string `yaml:"interval"`          // reserved: cairn watch re-audit cadence
+	AllowRemoteConfig bool   `yaml:"allowRemoteConfig"` // reserved: config-editing endpoints
+}
+
 // Defaults returns a Config populated with v0.4 §4 defaults. Load unmarshals the
 // file over this, so absent keys keep these values.
 func Defaults() Config {
@@ -77,6 +89,7 @@ func Defaults() Config {
 		},
 		Links: LinksConfig{CheckExternal: false},
 		Tier2: Tier2Config{Mode: "auto"},
+		Serve: ServeConfig{Host: "127.0.0.1", Port: 8787, Interval: "15m"},
 	}
 }
 
@@ -143,6 +156,13 @@ func (c *Config) validate() error {
 	case "auto", "require", "off":
 	default:
 		return fmt.Errorf("config: tier2.mode %q: must be auto, require, or off", c.Tier2.Mode)
+	}
+
+	if c.Serve.Host == "" {
+		return fmt.Errorf("config: serve.host: required")
+	}
+	if c.Serve.Port < 1 || c.Serve.Port > 65535 {
+		return fmt.Errorf("config: serve.port %d: must be 1-65535", c.Serve.Port)
 	}
 
 	allowedFormats := map[string]bool{"console": true, "markdown": true, "json": true, "tasks": true}
