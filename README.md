@@ -6,12 +6,24 @@ security headers, broken links, and structured data — with no mandatory API
 keys, no cloud dependency, and no mandatory headless browser. It ships as a
 single static Go binary, so it runs anywhere from a Raspberry Pi to a CI runner.
 
-> **Status: early construction.** Cairn is being built from a detailed spec
-> (`webqa-SPEC-v4.md`, canonical) starting with a vertical-slice "walking
+> **Status: early construction, but runnable.** Cairn is being built from a
+> detailed spec (`webqa-SPEC-v4.md`, canonical) via a vertical-slice "walking
 > skeleton" that proves the load-bearing architecture before module breadth is
-> added. Milestone 1 (config + core types) is in place; the fetch engine,
-> checks, outputs, and the WASM plugin sandbox follow. Not yet usable for real
-> audits.
+> added. Working today: config, the polite fetch engine, the `security-headers`
+> check, and console/JSON/Markdown/tasks output — so `cairn --config cairn.yaml`
+> already produces a real (security-only) audit of a live site. Still to come:
+> broken-links, the WASM plugin sandbox, then the SEO/GEO/a11y/structured-data
+> modules and Tier 2.
+
+## Quick start
+
+```sh
+go build -o cairn ./cmd/cairn
+./cairn --config slice.yaml     # audits the configured site(s)
+```
+
+Exit code is non-zero when a finding at or above `failOn` is present, so it
+drops straight into CI.
 
 ## What makes it different
 
