@@ -4,6 +4,7 @@
 package checks
 
 import (
+	"github.com/Estetika101/cairn/internal/checks/links"
 	"github.com/Estetika101/cairn/internal/checks/security"
 	"github.com/Estetika101/cairn/internal/model"
 )
@@ -13,6 +14,6 @@ import (
 func Builtins() []model.Check {
 	return []model.Check{
 		security.New(),
-		// links.New() lands in milestone 4.
+		links.New(),
 	}
 }
