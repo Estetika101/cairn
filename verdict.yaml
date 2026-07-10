@@ -9,6 +9,7 @@ checks:
     links: true
     security: true
     seo: true
+    geo: true
 accessibility:
     wcagVersion: "2.2"
     wcagLevel: AA

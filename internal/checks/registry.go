@@ -4,6 +4,7 @@
 package checks
 
 import (
+	"github.com/Estetika101/verdict/internal/checks/geo"
 	"github.com/Estetika101/verdict/internal/checks/links"
 	"github.com/Estetika101/verdict/internal/checks/security"
 	"github.com/Estetika101/verdict/internal/checks/seo"
@@ -18,5 +19,6 @@ func Builtins() []model.Check {
 		links.New(),
 	}
 	all = append(all, seo.All()...)
+	all = append(all, geo.All()...)
 	return all
 }

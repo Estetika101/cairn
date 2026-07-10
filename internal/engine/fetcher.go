@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/Estetika101/verdict/internal/model"
+	"github.com/Estetika101/verdict/internal/robotstxt"
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -52,7 +53,7 @@ type Fetcher struct {
 	mu       sync.Mutex
 	cache    map[string]cacheEntry
 	inflight map[string]*flight
-	robots   map[string]*robotsRules // per-host, nil-safe once resolved
+	robots   map[string]*robotstxt.Rules // per-host, nil-safe once resolved
 	budget   int
 
 	netReqs atomic.Int64
@@ -69,10 +70,10 @@ func NewFetcher(cfg model.CrawlConfig) *Fetcher {
 	f := &Fetcher{
 		cfg:      cfg,
 		lim:      newLimiter(cfg.MaxConcurrentRequests, cfg.PerHost.Concurrency, cfg.PerHost.DelayMs),
-		uaToken:  uaToken(cfg.UserAgent),
+		uaToken:  robotstxt.ProductToken(cfg.UserAgent),
 		cache:    map[string]cacheEntry{},
 		inflight: map[string]*flight{},
-		robots:   map[string]*robotsRules{},
+		robots:   map[string]*robotstxt.Rules{},
 		budget:   cfg.MaxExtraFetches,
 	}
 	f.client = &http.Client{
@@ -150,7 +151,7 @@ func (f *Fetcher) fetchUncached(ctx context.Context, u *url.URL, canon string, k
 	// 2. robots.txt gate.
 	if f.cfg.RespectRobots {
 		rules := f.ensureRobots(ctx, u)
-		if !rules.allowed(u.EscapedPath()) {
+		if !rules.Allowed(u.EscapedPath()) {
 			return model.PageData{}, model.ErrRobotsDisallowed
 		}
 	}
@@ -174,7 +175,7 @@ func (f *Fetcher) fetchUncached(ctx context.Context, u *url.URL, canon string, k
 // robots fetch is an internal engine fetch: it skips the robots gate (a
 // robots.txt request can't be gated on robots.txt) and consumes no budget
 // (v0.4 §3b). On any error it fails open (allow) for the slice.
-func (f *Fetcher) ensureRobots(ctx context.Context, u *url.URL) *robotsRules {
+func (f *Fetcher) ensureRobots(ctx context.Context, u *url.URL) *robotstxt.Rules {
 	host := strings.ToLower(u.Host)
 	f.mu.Lock()
 	if r, ok := f.robots[host]; ok {
@@ -184,12 +185,12 @@ func (f *Fetcher) ensureRobots(ctx context.Context, u *url.URL) *robotsRules {
 	f.mu.Unlock()
 
 	robotsURL := u.Scheme + "://" + u.Host + "/robots.txt"
-	var rules *robotsRules
+	var rules *robotstxt.Rules
 	pd, err := f.rawGet(ctx, robotsURL, false)
 	if err != nil || pd.Status < 200 || pd.Status >= 300 {
-		rules = &robotsRules{} // fail open
+		rules = &robotstxt.Rules{} // fail open
 	} else {
-		rules = parseRobots(pd.Body, f.uaToken)
+		rules = robotstxt.Parse(pd.Body, f.uaToken)
 	}
 
 	f.mu.Lock()

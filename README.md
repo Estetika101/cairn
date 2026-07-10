@@ -17,12 +17,17 @@ single static Go binary, so it runs anywhere from a Raspberry Pi to a CI runner.
 > So `verdict --config verdict.yaml` produces a real audit of a live site today.
 >
 > Since the slice: the full **SEO module** (16 checks — on-page, social, sitemap,
-> hreflang reciprocity, duplicate-content) landed, and a **local browser
-> dashboard** (`verdict serve`) now renders any report interactively — including a
-> **Config tab** to add/remove sites, toggle checks, and trigger a fresh audit
-> without touching YAML by hand.
+> hreflang reciprocity, duplicate-content) landed, a **local browser dashboard**
+> (`verdict serve`) now renders any report interactively — including a **Config
+> tab** to add/remove sites, toggle checks, and trigger a fresh audit without
+> touching YAML by hand — and the **GEO module** landed: AI-crawler posture
+> (grouped by vendor and by purpose — training / search / user-fetch, not just
+> a flat allow/block), `llms.txt` structural validation against the actual
+> (tiny) spec, and publish/modified-date presence + measured age. GEO
+> deliberately reports facts, not judgments — see the module's doc comment for
+> why a staleness *threshold* is a different, paid-tier-shaped feature.
 >
-> Still to come: GEO / accessibility / structured-data modules, Tier 2
+> Still to come: accessibility / structured-data modules, Tier 2
 > (Chromium — Core Web Vitals + rendered a11y), `watch`/`init`, comment-preserving
 > config writes, local run-over-run diff, and multi-site concurrency.
 
