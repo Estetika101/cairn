@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/Estetika101/cairn/internal/model"
-	"github.com/Estetika101/cairn/internal/report"
+	"github.com/Estetika101/verdict/internal/model"
+	"github.com/Estetika101/verdict/internal/report"
 )
 
 // stubCtx is a page-scoped CheckContext over a synthetic PageData — enough to

@@ -1,4 +1,4 @@
-// Package engine is cairn's fetch/crawl core. The Fetcher is the single network
+// Package engine is verdict's fetch/crawl core. The Fetcher is the single network
 // path shared by the crawl and by every check's Fetch: politeness, robots, the
 // per-run cache, and the fetch budget are enforced here, once, for every caller
 // (v0.4 §3b/§7c). No check — built-in or plugin — opens its own socket.
@@ -17,7 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/model"
 	"github.com/PuerkitoBio/goquery"
 )
 

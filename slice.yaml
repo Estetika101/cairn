@@ -1,5 +1,5 @@
-# cairn — slice example config (v0.3-s1 walking skeleton)
-# Run: cairn --config slice.yaml
+# verdict — slice example config (v0.3-s1 walking skeleton)
+# Run: verdict --config slice.yaml
 sites:
   - name: Example
     url: https://example.com
@@ -18,11 +18,11 @@ failOn: error              # off | warn | error
 
 output:
   formats: [console, markdown, json, tasks]
-  outDir: ./cairn-report
+  outDir: ./verdict-report
 
 crawl:
   requestTimeoutMs: 10000
-  userAgent: "cairn/0.1 (+https://github.com/Estetika101/cairn)"
+  userAgent: "verdict/0.1 (+https://github.com/Estetika101/verdict)"
   maxRetries: 2
   retryAfterCapMs: 30000
   maxConcurrentRequests: 8   # GLOBAL in-flight cap across all hosts and sites

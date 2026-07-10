@@ -1,5 +1,5 @@
 .git
 .claude
-cairn
-cairn-report
+verdict
+verdict-report
 *.wasm

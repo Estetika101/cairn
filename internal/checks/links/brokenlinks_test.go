@@ -8,15 +8,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Estetika101/cairn/internal/checks/links"
-	"github.com/Estetika101/cairn/internal/engine"
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/checks/links"
+	"github.com/Estetika101/verdict/internal/engine"
+	"github.com/Estetika101/verdict/internal/model"
 )
 
 func cfg() model.CrawlConfig {
 	return model.CrawlConfig{
 		RequestTimeoutMs:      5000,
-		UserAgent:             "cairn/0.1 (+test)",
+		UserAgent:             "verdict/0.1 (+test)",
 		MaxRetries:            0,
 		RetryAfterCapMs:       1000,
 		MaxConcurrentRequests: 8,

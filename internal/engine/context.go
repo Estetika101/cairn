@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/model"
 )
 
 // checkCtx is the concrete CheckContext handed to both built-in checks and (via

@@ -4,10 +4,10 @@
 package checks
 
 import (
-	"github.com/Estetika101/cairn/internal/checks/links"
-	"github.com/Estetika101/cairn/internal/checks/security"
-	"github.com/Estetika101/cairn/internal/checks/seo"
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/checks/links"
+	"github.com/Estetika101/verdict/internal/checks/security"
+	"github.com/Estetika101/verdict/internal/checks/seo"
+	"github.com/Estetika101/verdict/internal/model"
 )
 
 // Builtins returns every compiled-in check. The caller filters by config

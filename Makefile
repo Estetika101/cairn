@@ -1,7 +1,7 @@
 .PHONY: build test race vet plugins
 
 build:
-	go build -o cairn ./cmd/cairn
+	go build -o verdict ./cmd/verdict
 
 test:
 	go test ./...

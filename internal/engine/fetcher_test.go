@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/model"
 )
 
 func testCfg() model.CrawlConfig {
 	return model.CrawlConfig{
 		RequestTimeoutMs:      5000,
-		UserAgent:             "cairn/0.1 (+https://github.com/Estetika101/cairn)",
+		UserAgent:             "verdict/0.1 (+https://github.com/Estetika101/verdict)",
 		MaxRetries:            0,
 		RetryAfterCapMs:       1000,
 		MaxConcurrentRequests: 8,

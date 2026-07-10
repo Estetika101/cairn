@@ -1,4 +1,4 @@
-module github.com/Estetika101/cairn
+module github.com/Estetika101/verdict
 
 go 1.25.0
 

@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/model"
 )
 
 // WriteJSON emits the report envelope as indented JSON.

@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/model"
 )
 
-// WriteTasks emits cairn-tasks.md: a flat, agent-facing checklist grouped by
+// WriteTasks emits verdict-tasks.md: a flat, agent-facing checklist grouped by
 // severity then module, derived from the same findings as every other format
 // (v0.4 §6b). Each item leads with the stable ID for dedup across runs.
 func WriteTasks(w io.Writer, rep model.Report) {
-	fmt.Fprintf(w, "# cairn action items\n\n")
+	fmt.Fprintf(w, "# verdict action items\n\n")
 
 	writeGroup(w, rep, "## Errors (fix before next deploy)", func(f model.Finding) bool {
 		return f.Status == model.StatusFail && f.Severity == model.SeverityError

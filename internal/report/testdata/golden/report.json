@@ -1,0 +1,149 @@
+{
+  "schemaVersion": "1.0.0-draft",
+  "tool": {
+    "name": "verdict",
+    "version": "0.1.0-dev"
+  },
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "sites": [
+    {
+      "name": "Fixture",
+      "url": "http://fixture.test",
+      "summary": {
+        "fail": 5,
+        "pass": 5,
+        "skipped": 0,
+        "info": 0
+      },
+      "findings": [
+        {
+          "id": "d4962d4254",
+          "module": "links",
+          "scope": "site",
+          "criterion": "links: reachable",
+          "status": "fail",
+          "severity": "error",
+          "location": {
+            "url": "http://fixture.test/dead",
+            "affectedUrls": [
+              "http://fixture.test",
+              "http://fixture.test/a"
+            ]
+          },
+          "observed": "HTTP 404",
+          "required": "a reachable target returning 2xx",
+          "suggestedFix": "Fix or remove the link; the target is dead."
+        },
+        {
+          "id": "3340d57d0e",
+          "module": "security",
+          "scope": "page",
+          "criterion": "Content-Security-Policy",
+          "status": "fail",
+          "severity": "error",
+          "location": {
+            "url": "http://fixture.test"
+          },
+          "observed": "Content-Security-Policy header absent",
+          "required": "Content-Security-Policy header present",
+          "suggestedFix": "Add a Content-Security-Policy header (start report-only, then enforce)."
+        },
+        {
+          "id": "75a65c7371",
+          "module": "security",
+          "scope": "page",
+          "criterion": "Content-Security-Policy",
+          "status": "fail",
+          "severity": "error",
+          "location": {
+            "url": "http://fixture.test/a"
+          },
+          "observed": "Content-Security-Policy header absent",
+          "required": "Content-Security-Policy header present",
+          "suggestedFix": "Add a Content-Security-Policy header (start report-only, then enforce)."
+        },
+        {
+          "id": "9625f365ba",
+          "module": "security",
+          "scope": "page",
+          "criterion": "X-Frame-Options / frame-ancestors",
+          "status": "fail",
+          "severity": "warn",
+          "location": {
+            "url": "http://fixture.test/a"
+          },
+          "observed": "neither X-Frame-Options nor CSP frame-ancestors present",
+          "required": "X-Frame-Options or a CSP frame-ancestors directive",
+          "suggestedFix": "Add X-Frame-Options: DENY (or SAMEORIGIN), or a CSP frame-ancestors directive."
+        },
+        {
+          "id": "d2fe1801af",
+          "module": "security",
+          "scope": "page",
+          "criterion": "X-Frame-Options / frame-ancestors",
+          "status": "fail",
+          "severity": "warn",
+          "location": {
+            "url": "http://fixture.test"
+          },
+          "observed": "neither X-Frame-Options nor CSP frame-ancestors present",
+          "required": "X-Frame-Options or a CSP frame-ancestors directive",
+          "suggestedFix": "Add X-Frame-Options: DENY (or SAMEORIGIN), or a CSP frame-ancestors directive."
+        },
+        {
+          "id": "fbd2409341",
+          "module": "links",
+          "scope": "site",
+          "criterion": "links: reachable",
+          "status": "pass",
+          "location": {
+            "url": "http://fixture.test/a",
+            "affectedUrls": [
+              "http://fixture.test"
+            ]
+          }
+        },
+        {
+          "id": "11f8c4fd6e",
+          "module": "security",
+          "scope": "page",
+          "criterion": "Referrer-Policy",
+          "status": "pass",
+          "location": {
+            "url": "http://fixture.test"
+          }
+        },
+        {
+          "id": "14a7b8a152",
+          "module": "security",
+          "scope": "page",
+          "criterion": "X-Content-Type-Options",
+          "status": "pass",
+          "location": {
+            "url": "http://fixture.test"
+          }
+        },
+        {
+          "id": "67be857512",
+          "module": "security",
+          "scope": "page",
+          "criterion": "X-Content-Type-Options",
+          "status": "pass",
+          "location": {
+            "url": "http://fixture.test/a"
+          }
+        },
+        {
+          "id": "7aebeb207c",
+          "module": "security",
+          "scope": "page",
+          "criterion": "Referrer-Policy",
+          "status": "pass",
+          "location": {
+            "url": "http://fixture.test/a"
+          }
+        }
+      ]
+    }
+  ]
+}

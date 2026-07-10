@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/Estetika101/cairn/internal/checks/seo"
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/checks/seo"
+	"github.com/Estetika101/verdict/internal/model"
 )
 
 func runSite(t *testing.T, c model.Check, cc *stubCtx) []model.Finding {

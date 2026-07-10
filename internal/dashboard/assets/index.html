@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
-<title>cairn — audit report</title>
+<title>verdict — audit report</title>
 <style>
   :root {
     --bg: #0f1115; --panel: #161922; --border: #262b38; --text: #e6e8ee; --muted: #8b93a7;
@@ -83,7 +83,7 @@
 </head>
 <body>
 <header>
-  <h1>cairn</h1>
+  <h1>verdict</h1>
   <span class="meta" id="meta"></span>
   <div class="spacer"></div>
   <div class="view-tabs">
@@ -121,9 +121,9 @@
 <div id="configView" hidden>
   <div class="config-banner" id="configBanner"></div>
   <div id="configUnavailable" hidden>
-    <p>Config editing isn't available in this session — <code>cairn serve</code> was
+    <p>Config editing isn't available in this session — <code>verdict serve</code> was
     started without <code>--config</code>. Restart it with
-    <code>cairn serve --config your-config.yaml</code> to edit settings and trigger
+    <code>verdict serve --config your-config.yaml</code> to edit settings and trigger
     audits from here.</p>
   </div>
   <div id="configForm" hidden>
@@ -396,7 +396,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('#formatsRow input[data-format]'), function (el) {
       el.checked = formats.indexOf(el.getAttribute('data-format')) >= 0;
     });
-    outDirEl.value = (configData.output && configData.output.outDir) || './cairn-report';
+    outDirEl.value = (configData.output && configData.output.outDir) || './verdict-report';
   }
 
   function addSiteRow(site, index) {

@@ -2,6 +2,9 @@ sites:
     - name: Estetika
       url: https://estetika.org
       crawlLimit: 6
+    - name: Woest
+      url: https://woest.io
+      crawlLimit: 0
 checks:
     links: true
     security: true
@@ -16,10 +19,10 @@ output:
         - markdown
         - json
         - tasks
-    outDir: ./cairn-report
+    outDir: ./verdict-report
 crawl:
     requestTimeoutMs: 10000
-    userAgent: cairn/0.1 (+https://github.com/Estetika101/cairn)
+    userAgent: verdict/0.1 (+https://github.com/Estetika101/verdict)
     maxRetries: 2
     retryAfterCapMs: 30000
     maxConcurrentRequests: 8

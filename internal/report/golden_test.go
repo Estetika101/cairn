@@ -12,11 +12,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Estetika101/cairn/internal/checks/links"
-	"github.com/Estetika101/cairn/internal/checks/security"
-	"github.com/Estetika101/cairn/internal/engine"
-	"github.com/Estetika101/cairn/internal/model"
-	"github.com/Estetika101/cairn/internal/report"
+	"github.com/Estetika101/verdict/internal/checks/links"
+	"github.com/Estetika101/verdict/internal/checks/security"
+	"github.com/Estetika101/verdict/internal/engine"
+	"github.com/Estetika101/verdict/internal/model"
+	"github.com/Estetika101/verdict/internal/report"
 )
 
 var updateGolden = flag.Bool("update-golden", false, "rewrite the golden files")
@@ -28,7 +28,7 @@ const canonHost = "http://fixture.test"
 func goldenCfg() model.CrawlConfig {
 	return model.CrawlConfig{
 		RequestTimeoutMs:      5000,
-		UserAgent:             "cairn/0.1 (+test)",
+		UserAgent:             "verdict/0.1 (+test)",
 		MaxConcurrentRequests: 8,
 		MaxExtraFetches:       500,
 		SiteConcurrency:       1,
@@ -37,7 +37,7 @@ func goldenCfg() model.CrawlConfig {
 	}
 }
 
-// Row 12: report.json and cairn-tasks.md byte-match the goldens, with stable IDs
+// Row 12: report.json and verdict-tasks.md byte-match the goldens, with stable IDs
 // and a fixed generatedAt.
 func TestGoldenReport(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +73,7 @@ func TestGoldenReport(t *testing.T) {
 
 	rep := model.Report{
 		SchemaVersion: "1.0.0-draft",
-		Tool:          model.ToolInfo{Name: "cairn", Version: "0.1.0-dev"},
+		Tool:          model.ToolInfo{Name: "verdict", Version: "0.1.0-dev"},
 		GeneratedAt:   "2026-01-01T00:00:00Z",
 		Sites:         []model.SiteReport{sr},
 	}
@@ -85,7 +85,7 @@ func TestGoldenReport(t *testing.T) {
 	report.WriteTasks(&tasksBuf, rep)
 
 	checkGolden(t, "report.json", jsonBuf.Bytes())
-	checkGolden(t, "cairn-tasks.md", tasksBuf.Bytes())
+	checkGolden(t, "verdict-tasks.md", tasksBuf.Bytes())
 }
 
 func normalize(sr *model.SiteReport, from, to string) {

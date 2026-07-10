@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/model"
 )
 
 // WriteMarkdown emits a human-readable report (report.md) — the same findings as
 // the console view, in a form suitable for committing or pasting into a PR.
 func WriteMarkdown(w io.Writer, rep model.Report) {
-	fmt.Fprintf(w, "# cairn report\n\n")
+	fmt.Fprintf(w, "# verdict report\n\n")
 	for _, site := range rep.Sites {
 		s := site.Summary
 		fmt.Fprintf(w, "## %s\n\n%s\n\n", site.Name, site.URL)

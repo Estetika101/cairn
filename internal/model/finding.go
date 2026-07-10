@@ -1,4 +1,4 @@
-// Package model holds the shared value types for cairn. It has no logic and
+// Package model holds the shared value types for verdict. It has no logic and
 // imports nothing from other internal packages, so engine, checks, plugin, and
 // report can all depend on it without cycles.
 package model

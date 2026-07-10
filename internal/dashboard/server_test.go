@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Estetika101/cairn/internal/dashboard"
+	"github.com/Estetika101/verdict/internal/dashboard"
 )
 
 func TestReportEndpoint(t *testing.T) {
@@ -124,7 +124,7 @@ failOn: error
 
 func writeConfig(t *testing.T, dir string) string {
 	t.Helper()
-	path := filepath.Join(dir, "cairn.yaml")
+	path := filepath.Join(dir, "verdict.yaml")
 	if err := os.WriteFile(path, []byte(validConfigYAML), 0o644); err != nil {
 		t.Fatal(err)
 	}

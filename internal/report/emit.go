@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/model"
 )
 
 // Emit writes every requested output format. Console goes to stdout; file
@@ -38,7 +38,7 @@ func Emit(rep model.Report, formats []string, outDir string, stdout io.Writer, c
 				return err
 			}
 		case "tasks":
-			if err := writeFile(filepath.Join(outDir, "cairn-tasks.md"), func(w io.Writer) error { WriteTasks(w, rep); return nil }); err != nil {
+			if err := writeFile(filepath.Join(outDir, "verdict-tasks.md"), func(w io.Writer) error { WriteTasks(w, rep); return nil }); err != nil {
 				return err
 			}
 		default:

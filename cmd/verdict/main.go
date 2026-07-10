@@ -1,4 +1,4 @@
-// Command cairn is an open-source, self-hostable web QA auditor.
+// Command verdict is an open-source, self-hostable web QA auditor.
 package main
 
 import (
@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Estetika101/cairn/internal/checks"
-	"github.com/Estetika101/cairn/internal/config"
-	"github.com/Estetika101/cairn/internal/dashboard"
-	"github.com/Estetika101/cairn/internal/engine"
-	"github.com/Estetika101/cairn/internal/model"
-	"github.com/Estetika101/cairn/internal/plugin"
-	"github.com/Estetika101/cairn/internal/report"
+	"github.com/Estetika101/verdict/internal/checks"
+	"github.com/Estetika101/verdict/internal/config"
+	"github.com/Estetika101/verdict/internal/dashboard"
+	"github.com/Estetika101/verdict/internal/engine"
+	"github.com/Estetika101/verdict/internal/model"
+	"github.com/Estetika101/verdict/internal/plugin"
+	"github.com/Estetika101/verdict/internal/report"
 )
 
 // version is the tool's own release version, distinct from the report schema.
@@ -26,7 +26,7 @@ func main() {
 }
 
 // run dispatches on the command grammar (v0.4 §4b): `audit` is the default
-// verb, so a bare `cairn --config x.yaml` is an alias for `cairn audit
+// verb, so a bare `verdict --config x.yaml` is an alias for `verdict audit
 // --config x.yaml`. `serve` is the only other verb implemented so far.
 func run(args []string, stdout, stderr *os.File) int {
 	if len(args) > 0 && args[0] == "serve" {
@@ -66,7 +66,7 @@ func runOnce(ctx context.Context, cfg *config.Config) (model.Report, error) {
 
 	rep := model.Report{
 		SchemaVersion: "1.0.0-draft",
-		Tool:          model.ToolInfo{Name: "cairn", Version: version},
+		Tool:          model.ToolInfo{Name: "verdict", Version: version},
 		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
 	}
 
@@ -86,9 +86,9 @@ func runOnce(ctx context.Context, cfg *config.Config) (model.Report, error) {
 }
 
 func runAudit(args []string, stdout, stderr *os.File) int {
-	fs := flag.NewFlagSet("cairn audit", flag.ContinueOnError)
+	fs := flag.NewFlagSet("verdict audit", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	configPath := fs.String("config", "cairn.yaml", "path to the config file")
+	configPath := fs.String("config", "verdict.yaml", "path to the config file")
 	outDir := fs.String("out", "", "override output.outDir")
 	serve := fs.Bool("serve", false, "after auditing, start the local dashboard on the result")
 	if err := fs.Parse(args); err != nil {
@@ -106,7 +106,7 @@ func runAudit(args []string, stdout, stderr *os.File) int {
 		cfg.Output.OutDir = *outDir
 	} else {
 		// A relative outDir that came FROM the config file anchors to the
-		// config file's own directory, not whatever cwd cairn happens to run
+		// config file's own directory, not whatever cwd verdict happens to run
 		// from — see resolveOutDir's doc comment.
 		cfg.Output.OutDir = resolveOutDir(*configPath, cfg.Output.OutDir)
 	}
@@ -114,7 +114,7 @@ func runAudit(args []string, stdout, stderr *os.File) int {
 	ctx := context.Background()
 	rep, rerr := runOnce(ctx, cfg)
 	if rerr != nil {
-		fmt.Fprintf(stderr, "cairn: %v\n", rerr)
+		fmt.Fprintf(stderr, "verdict: %v\n", rerr)
 		return 2
 	}
 
@@ -135,7 +135,7 @@ func runAudit(args []string, stdout, stderr *os.File) int {
 	}
 
 	addr := fmt.Sprintf("%s:%d", cfg.Serve.Host, cfg.Serve.Port)
-	fmt.Fprintf(stdout, "cairn: exit code would be %d; serving results at http://%s (Ctrl+C to stop)\n", code, addr)
+	fmt.Fprintf(stdout, "verdict: exit code would be %d; serving results at http://%s (Ctrl+C to stop)\n", code, addr)
 	opts := dashboardOptions(*configPath, cfg.Output.OutDir, cfg.Serve.AllowRemoteConfig)
 	if err := dashboard.ListenAndServe(addr, opts); err != nil {
 		fmt.Fprintln(stderr, err)
@@ -156,14 +156,14 @@ func contains(ss []string, s string) bool {
 // runServe starts the dashboard against an already-written report directory.
 // --report wins if both --config and --report are given; otherwise the
 // directory is derived from --config's output.outDir, defaulting to
-// ./cairn-report. When --config is given, the dashboard also gets a working
+// ./verdict-report. When --config is given, the dashboard also gets a working
 // config editor and "run audit now" trigger (each fresh-loading cfg from
 // configPath, so a saved edit takes effect on the next triggered run).
 func runServe(args []string, stdout, stderr *os.File) int {
-	fs := flag.NewFlagSet("cairn serve", flag.ContinueOnError)
+	fs := flag.NewFlagSet("verdict serve", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	configPath := fs.String("config", "", "config file to derive the report directory and bind address from, and to enable the config editor + audit trigger")
-	reportDir := fs.String("report", "", "directory containing report.json (default: ./cairn-report, or output.outDir from --config)")
+	reportDir := fs.String("report", "", "directory containing report.json (default: ./verdict-report, or output.outDir from --config)")
 	host := fs.String("host", "", "bind address (default 127.0.0.1, or serve.host from --config)")
 	port := fs.Int("port", 0, "port (default 8787, or serve.port from --config)")
 	if err := fs.Parse(args); err != nil {
@@ -187,7 +187,7 @@ func runServe(args []string, stdout, stderr *os.File) int {
 		allowRemoteConfig = cfg.Serve.AllowRemoteConfig
 	}
 	if dir == "" {
-		dir = "./cairn-report"
+		dir = "./verdict-report"
 	}
 	if *host != "" {
 		bindHost = *host
@@ -198,9 +198,9 @@ func runServe(args []string, stdout, stderr *os.File) int {
 
 	addr := fmt.Sprintf("%s:%d", bindHost, bindPort)
 	if *configPath == "" {
-		fmt.Fprintf(stdout, "cairn: serving %s at http://%s (view-only — no --config given, so config editing and the audit trigger are disabled; Ctrl+C to stop)\n", dir, addr)
+		fmt.Fprintf(stdout, "verdict: serving %s at http://%s (view-only — no --config given, so config editing and the audit trigger are disabled; Ctrl+C to stop)\n", dir, addr)
 	} else {
-		fmt.Fprintf(stdout, "cairn: serving %s at http://%s (Ctrl+C to stop)\n", dir, addr)
+		fmt.Fprintf(stdout, "verdict: serving %s at http://%s (Ctrl+C to stop)\n", dir, addr)
 	}
 	opts := dashboardOptions(*configPath, dir, allowRemoteConfig)
 	if err := dashboard.ListenAndServe(addr, opts); err != nil {

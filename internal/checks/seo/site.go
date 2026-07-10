@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/model"
 	"github.com/PuerkitoBio/goquery"
 )
 

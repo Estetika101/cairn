@@ -5,7 +5,7 @@ import (
 	"io"
 	"sort"
 
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/model"
 )
 
 // ansi color codes, used only when color is enabled (a TTY, NO_COLOR unset).

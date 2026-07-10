@@ -42,7 +42,7 @@ func (r *robotsRules) allowed(path string) bool {
 }
 
 // parseRobots extracts the rule group applicable to uaToken (a product token
-// like "cairn"). A group headed by one or more User-agent lines applies to those
+// like "verdict"). A group headed by one or more User-agent lines applies to those
 // agents; the most specific matching group wins, falling back to "*".
 func parseRobots(body []byte, uaToken string) *robotsRules {
 	uaToken = strings.ToLower(uaToken)
@@ -112,7 +112,7 @@ func parseRobots(body []byte, uaToken string) *robotsRules {
 }
 
 // uaToken extracts the product token from a full User-Agent string, e.g.
-// "cairn/0.1 (+https://…)" -> "cairn".
+// "verdict/0.1 (+https://…)" -> "verdict".
 func uaToken(ua string) string {
 	ua = strings.TrimSpace(ua)
 	if ua == "" {

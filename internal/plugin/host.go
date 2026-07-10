@@ -1,6 +1,6 @@
 // Package plugin runs third-party checks as sandboxed WebAssembly. A plugin has
 // no ambient authority: the wazero host grants it exactly one capability —
-// cairn.fetch, which routes into the engine's Fetcher — and nothing else (no
+// verdict.fetch, which routes into the engine's Fetcher — and nothing else (no
 // WASI, no filesystem, no sockets). What v0.1/v0.2 could only ask checks to
 // honor, the sandbox removes the authority to violate (v0.4 §2c).
 package plugin
@@ -12,7 +12,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/model"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 )
@@ -33,7 +33,7 @@ type Plugin struct {
 	path    string
 }
 
-// Load compiles a .wasm plugin, wires the cairn host module, and reads its Meta.
+// Load compiles a .wasm plugin, wires the verdict host module, and reads its Meta.
 // Instantiation is where a guest importing a capability the host doesn't provide
 // (e.g. WASI) fails — so a plugin that tries to reach outside the sandbox never
 // even loads.
@@ -47,7 +47,7 @@ func Load(ctx context.Context, path string) (*Plugin, error) {
 		WithCloseOnContextDone(true).
 		WithMemoryLimitPages(memoryLimitPages))
 
-	if _, err := r.NewHostModuleBuilder("cairn").
+	if _, err := r.NewHostModuleBuilder("verdict").
 		NewFunctionBuilder().WithFunc(hostFetch).Export("fetch").
 		Instantiate(ctx); err != nil {
 		r.Close(ctx)

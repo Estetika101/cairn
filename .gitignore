@@ -1,12 +1,13 @@
 # Build output
-/cairn
+/verdict
 /dist/
 *.exe
 
-# Audit output
-/cairn-report/
-report.json
-cairn-tasks.md
+# Audit output (root-anchored: must not swallow test golden fixtures of the
+# same name nested under internal/*/testdata/golden/)
+/verdict-report/
+/report.json
+/verdict-tasks.md
 
 # Go
 /vendor/

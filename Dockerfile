@@ -5,12 +5,12 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o /cairn ./cmd/cairn
+RUN CGO_ENABLED=0 go build -o /verdict ./cmd/verdict
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
-COPY --from=build /cairn /usr/local/bin/cairn
+COPY --from=build /verdict /usr/local/bin/verdict
 WORKDIR /data
 EXPOSE 8787
-ENTRYPOINT ["cairn"]
-CMD ["serve", "--host", "0.0.0.0", "--report", "/data/cairn-report"]
+ENTRYPOINT ["verdict"]
+CMD ["serve", "--host", "0.0.0.0", "--report", "/data/verdict-report"]

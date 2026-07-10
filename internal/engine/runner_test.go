@@ -6,15 +6,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Estetika101/cairn/internal/checks/security"
-	"github.com/Estetika101/cairn/internal/engine"
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/checks/security"
+	"github.com/Estetika101/verdict/internal/engine"
+	"github.com/Estetika101/verdict/internal/model"
 )
 
 func runnerCfg() model.CrawlConfig {
 	return model.CrawlConfig{
 		RequestTimeoutMs:      5000,
-		UserAgent:             "cairn/0.1 (+test)",
+		UserAgent:             "verdict/0.1 (+test)",
 		MaxRetries:            0,
 		MaxConcurrentRequests: 8,
 		MaxExtraFetches:       500,

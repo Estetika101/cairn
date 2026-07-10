@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Estetika101/cairn/internal/engine"
-	"github.com/Estetika101/cairn/internal/model"
-	"github.com/Estetika101/cairn/internal/plugin"
+	"github.com/Estetika101/verdict/internal/engine"
+	"github.com/Estetika101/verdict/internal/model"
+	"github.com/Estetika101/verdict/internal/plugin"
 )
 
 const (
@@ -129,7 +129,7 @@ func TestGrantedFetchIsGoverned(t *testing.T) {
 
 	f := engine.NewFetcher(model.CrawlConfig{
 		RequestTimeoutMs:      5000,
-		UserAgent:             "cairn/0.1 (+test)",
+		UserAgent:             "verdict/0.1 (+test)",
 		MaxConcurrentRequests: 8,
 		MaxExtraFetches:       500,
 		RespectRobots:         true,

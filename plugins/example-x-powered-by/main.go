@@ -1,4 +1,4 @@
-// example-x-powered-by is a demo third-party cairn check, compiled to WASM. It
+// example-x-powered-by is a demo third-party verdict check, compiled to WASM. It
 // flags the presence of an X-Powered-By response header (an information-leak
 // smell) as status:info. It needs only the page headers it is handed, so it
 // imports no host capability at all — proving a plugin the sandbox grants
@@ -54,7 +54,7 @@ func readMem(ptr, ln uint32) []byte {
 	return unsafe.Slice((*byte)(unsafe.Pointer(uintptr(ptr))), ln)
 }
 
-// --- ABI wire types (a subset of cairn's model, JSON-compatible) ---
+// --- ABI wire types (a subset of verdict's model, JSON-compatible) ---
 
 type wireMeta struct {
 	ID       string `json:"id"`

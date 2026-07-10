@@ -16,7 +16,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Estetika101/cairn/internal/config"
+	"github.com/Estetika101/verdict/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,7 +26,7 @@ var assetsFS embed.FS
 // Options configures a Server. ReportDir is required (it's what /api/report
 // and the report view read). ConfigPath and RunAudit are optional together:
 // with both empty/nil, the dashboard is a pure read-only viewer, matching
-// `cairn serve --report` with no --config given.
+// `verdict serve --report` with no --config given.
 type Options struct {
 	ReportDir  string
 	ConfigPath string       // "" disables /api/config entirely
@@ -142,7 +142,7 @@ func reportHandler(reportDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data, err := os.ReadFile(path)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("no report.json in %s yet — run `cairn audit` first", reportDir), http.StatusNotFound)
+			http.Error(w, fmt.Sprintf("no report.json in %s yet — run `verdict audit` first", reportDir), http.StatusNotFound)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -157,7 +157,7 @@ func reportHandler(reportDir string) http.HandlerFunc {
 func configGetHandler(configPath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if configPath == "" {
-			http.Error(w, "config editing not available: cairn serve was not given --config", http.StatusNotImplemented)
+			http.Error(w, "config editing not available: verdict serve was not given --config", http.StatusNotImplemented)
 			return
 		}
 		cfg, err := config.Load(configPath)
@@ -180,13 +180,13 @@ func configGetHandler(configPath string) http.HandlerFunc {
 //
 // Known gap, stated plainly rather than left silent: this writes via
 // yaml.Marshal, which does NOT preserve comments or key order in the existing
-// file. A hand-written cairn.yaml with explanatory comments will lose them the
+// file. A hand-written verdict.yaml with explanatory comments will lose them the
 // first time it's saved from this form. Comment-preserving writes (via
 // yaml.v3's Node API) are real work, deferred rather than done partially.
 func configPostHandler(configPath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if configPath == "" {
-			http.Error(w, "config editing not available: cairn serve was not given --config", http.StatusNotImplemented)
+			http.Error(w, "config editing not available: verdict serve was not given --config", http.StatusNotImplemented)
 			return
 		}
 		cfg, err := config.Load(configPath)
@@ -223,11 +223,11 @@ func configPostHandler(configPath string) http.HandlerFunc {
 // auditPostHandler runs a fresh audit synchronously and reports success/error.
 // Synchronous is a deliberate scaffold-scope simplification — a real async job
 // queue (so a slow crawl doesn't hold the HTTP request open) is future work,
-// same pattern as `cairn watch` being reserved rather than half-built.
+// same pattern as `verdict watch` being reserved rather than half-built.
 func auditPostHandler(run func() error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if run == nil {
-			http.Error(w, "audit trigger not available: cairn serve was not given --config", http.StatusNotImplemented)
+			http.Error(w, "audit trigger not available: verdict serve was not given --config", http.StatusNotImplemented)
 			return
 		}
 		if err := run(); err != nil {

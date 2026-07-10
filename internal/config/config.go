@@ -1,4 +1,4 @@
-// Package config loads, defaults, and validates cairn's YAML config. Both the
+// Package config loads, defaults, and validates verdict's YAML config. Both the
 // file and (later) the web setup form write the same YAML; this loader is the
 // single validator behind every on-ramp, so a bad hand-edit fails loudly here
 // rather than crashing mid-run (v0.4 §6c).
@@ -10,11 +10,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/model"
 	"gopkg.in/yaml.v3"
 )
 
-// Config is the parsed cairn.yaml. It is a superset-tolerant view: unknown keys
+// Config is the parsed verdict.yaml. It is a superset-tolerant view: unknown keys
 // are ignored, absent keys take defaults. JSON tags (matching, lowercase
 // camelCase) let the dashboard's config-editing API round-trip this same
 // struct — GET returns it, a form edits a subset, POST merges back onto a
@@ -58,16 +58,16 @@ type Tier2Config struct {
 	ChromePath string `yaml:"chromePath" json:"chromePath"`
 }
 
-// ServeConfig governs `cairn serve` / `cairn audit --serve` (v0.4 §6c). Only
+// ServeConfig governs `verdict serve` / `verdict audit --serve` (v0.4 §6c). Only
 // Host/Port are consumed today; Interval and AllowRemoteConfig are reserved for
-// `cairn watch`, not yet built — schema surface for a capability the tool
+// `verdict watch`, not yet built — schema surface for a capability the tool
 // doesn't have yet, same pattern as autoFixable/effort. AllowRemoteConfig DOES
 // have real teeth now: it gates the dashboard's config-write/audit-trigger
 // endpoints, which stay localhost-only unless this is explicitly true.
 type ServeConfig struct {
 	Host              string `yaml:"host" json:"host"`
 	Port              int    `yaml:"port" json:"port"`
-	Interval          string `yaml:"interval" json:"interval"`                   // reserved: cairn watch re-audit cadence
+	Interval          string `yaml:"interval" json:"interval"`                   // reserved: verdict watch re-audit cadence
 	AllowRemoteConfig bool   `yaml:"allowRemoteConfig" json:"allowRemoteConfig"` // see doc comment above
 }
 
@@ -80,11 +80,11 @@ func Defaults() Config {
 		FailOn:        "error",
 		Output: OutputConfig{
 			Formats: []string{"console", "markdown", "json", "tasks"},
-			OutDir:  "./cairn-report",
+			OutDir:  "./verdict-report",
 		},
 		Crawl: model.CrawlConfig{
 			RequestTimeoutMs:      10000,
-			UserAgent:             "cairn/0.1 (+https://github.com/Estetika101/cairn)",
+			UserAgent:             "verdict/0.1 (+https://github.com/Estetika101/verdict)",
 			MaxRetries:            2,
 			RetryAfterCapMs:       30000,
 			MaxConcurrentRequests: 8,

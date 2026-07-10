@@ -1,4 +1,4 @@
-// fetch-caller is a denial-suite test guest: it DOES import cairn.fetch and calls
+// fetch-caller is a denial-suite test guest: it DOES import verdict.fetch and calls
 // it on the URL it is handed, proving the one granted capability is still routed
 // through the engine's gates (a robots-disallowed URL comes back as an error).
 //
@@ -48,7 +48,7 @@ func readMem(ptr, ln uint32) []byte {
 	return unsafe.Slice((*byte)(unsafe.Pointer(uintptr(ptr))), ln)
 }
 
-//go:wasmimport cairn fetch
+//go:wasmimport verdict fetch
 func hostFetch(urlPtr, urlLen uint32) uint64
 
 type wireContext struct {

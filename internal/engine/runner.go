@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"github.com/Estetika101/cairn/internal/model"
+	"github.com/Estetika101/verdict/internal/model"
 )
 
 // SiteTarget is the per-site input to a run.
