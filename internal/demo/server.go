@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -25,16 +26,23 @@ import (
 var assetsFS embed.FS
 
 const (
-	scansPerHour = 5
-	scanTimeout  = 15 * time.Second
+	scansPerHour    = 5
+	rateLimitWindow = time.Hour
+	scanTimeout     = 15 * time.Second
 )
 
 // Options configures a Server. Store, TurnstileSiteKey, and
 // TurnstileSecretKey are all optional together: leave them zero to run
-// without logging and without human verification (e.g. local dev). Turnstile
-// is on only when BOTH the site key (public, sent to the browser) and the
-// secret key (private, used server-side) are set — a site key alone would
-// render a widget nothing actually checks.
+// without logging/rate-limiting and without human verification (e.g. local
+// dev). Turnstile is on only when BOTH the site key (public, sent to the
+// browser) and the secret key (private, used server-side) are set — a site
+// key alone would render a widget nothing actually checks.
+//
+// Rate limiting requires Store: it's implemented as a count query against the
+// same log table LogScan writes to (see store.go's CountRecent doc comment
+// for why this replaced an earlier in-memory version). Running the demo
+// without a database means running it without rate limiting — acceptable for
+// local development, not for a public deployment.
 type Options struct {
 	Store              *Store
 	TurnstileSiteKey   string
@@ -44,8 +52,7 @@ type Options struct {
 // Server is the public demo endpoint: one visitor-submitted URL in, one
 // hardened fetch, a fixed set of page-scoped checks, a logged result out.
 type Server struct {
-	limiter   *rateLimiter
-	store     *Store // nil disables logging (e.g. local dev with no DATABASE_URL)
+	store     *Store // nil disables both logging AND rate limiting
 	checks    []model.Check
 	mux       *http.ServeMux
 	siteKey   string
@@ -74,9 +81,8 @@ func NewServer(opts Options) (*Server, error) {
 	}
 
 	s := &Server{
-		limiter: newRateLimiter(scansPerHour, time.Hour),
-		store:   opts.Store,
-		checks:  pageChecks,
+		store:  opts.Store,
+		checks: pageChecks,
 	}
 	// Both keys required, or neither counts — see the Options doc comment.
 	if opts.TurnstileSiteKey != "" && opts.TurnstileSecretKey != "" {
@@ -90,7 +96,6 @@ func NewServer(opts Options) (*Server, error) {
 	mux.HandleFunc("/api/turnstile-sitekey", s.handleSiteKey)
 	s.mux = mux
 
-	go s.sweepLoop()
 	return s, nil
 }
 
@@ -116,13 +121,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
-func (s *Server) sweepLoop() {
-	t := time.NewTicker(5 * time.Minute)
-	for range t.C {
-		s.limiter.sweep()
-	}
-}
-
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", "POST")
@@ -131,9 +129,25 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ip := clientIP(r)
-	if !s.limiter.Allow(ip) {
-		http.Error(w, fmt.Sprintf("rate limit exceeded — max %d scans/hour, try again later", scansPerHour), http.StatusTooManyRequests)
-		return
+	ctx, cancel := context.WithTimeout(r.Context(), scanTimeout)
+	defer cancel()
+
+	// Rate limiting reads the same log table LogScan writes to (see
+	// CountRecent's doc comment) — correct regardless of whether this process
+	// is the same one that handled this visitor's last request, which an
+	// in-memory counter could not guarantee on any elastic/serverless host.
+	// A rejected-for-rate-limit attempt is deliberately NOT logged: it adds
+	// no new information (the count that triggered the rejection is already
+	// in the table) and logging every throttled hit would itself be a cheap
+	// way to make this endpoint do more work under abuse, not less.
+	if s.store != nil {
+		n, err := s.store.CountRecent(ctx, ip, rateLimitWindow)
+		if err != nil {
+			log.Printf("demo: rate limit check failed, allowing request: %v", err)
+		} else if n >= scansPerHour {
+			http.Error(w, fmt.Sprintf("rate limit exceeded — max %d scans/hour, try again later", scansPerHour), http.StatusTooManyRequests)
+			return
+		}
 	}
 
 	var body struct {
@@ -149,9 +163,6 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "please provide a valid http(s) URL to scan", http.StatusBadRequest)
 		return
 	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), scanTimeout)
-	defer cancel()
 
 	// Turnstile verification only runs when a secret key is configured
 	// (see Options' doc comment) — local/dev runs without one work exactly
@@ -171,7 +182,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 
 	pd, err := safeFetch(ctx, target)
 	if err != nil {
-		s.logAsync(ScanLogEntry{Hostname: hostnameOf(target), RemoteIP: ip, Err: err.Error()})
+		s.logScan(ctx, ScanLogEntry{Hostname: hostnameOf(target), RemoteIP: ip, Err: err.Error()})
 		http.Error(w, "could not scan that URL: "+userFacingError(err), http.StatusBadRequest)
 		return
 	}
@@ -189,7 +200,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	engine.SortFindings(findings)
 	summary := model.Summarize(findings)
 
-	s.logAsync(ScanLogEntry{
+	s.logScan(ctx, ScanLogEntry{
 		Hostname: hostnameOf(target), RemoteIP: ip,
 		ErrorCount: countBySeverity(findings, model.SeverityError),
 		WarnCount:  countBySeverity(findings, model.SeverityWarn),
@@ -204,18 +215,25 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// logAsync never blocks or fails the actual scan response on a logging
-// hiccup — the log is for operator visibility, not something a visitor's
-// request should ever depend on.
-func (s *Server) logAsync(e ScanLogEntry) {
+// logScan is synchronous, deliberately not a fire-and-forget goroutine: on
+// any host that can freeze or tear down a process/instance immediately after
+// a response is sent (which includes serverless platforms, but is not
+// guaranteed to exclude a persistent host either during a deploy or restart),
+// a detached goroutine racing that teardown can simply never complete,
+// silently losing the log entry. A synchronous call with a bounded timeout
+// costs a little latency but guarantees the write is at least attempted
+// before the handler returns. A logging failure still never fails the
+// visitor's actual request — it's just written to stderr instead of the log
+// table.
+func (s *Server) logScan(ctx context.Context, e ScanLogEntry) {
 	if s.store == nil {
 		return
 	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = s.store.LogScan(ctx, e)
-	}()
+	logCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if err := s.store.LogScan(logCtx, e); err != nil {
+		log.Printf("demo: log scan failed: %v", err)
+	}
 }
 
 // demoCheckContext wraps exactly one already-fetched page. Fetch is

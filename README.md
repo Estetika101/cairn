@@ -57,7 +57,12 @@ just a flag on it:
   Postgres** (`--database-url`, or `$DATABASE_URL`; a hashed IP, hostname, and
   finding counts only — no scraped content, no plaintext IP) purely for
   operator visibility into what's being scanned. Logging is disabled, not
-  fatal, if no database is configured.
+  fatal, if no database is configured. Rate limiting is a `COUNT` query
+  against that same log table, deliberately not an in-memory counter — an
+  in-process map can't guarantee a given visitor's requests land on the same
+  warm instance on any elastic/serverless host, so it would silently stop
+  limiting anything the moment that assumption breaks. This also means rate
+  limiting is only active when a database is configured.
 - **Optional Cloudflare Turnstile human verification** (`--turnstile-sitekey`
   / `--turnstile-secret`, or `$TURNSTILE_SITE_KEY` / `$TURNSTILE_SECRET_KEY`).
   Off unless BOTH keys are set — a site key alone would render a widget
@@ -74,7 +79,19 @@ verdict demo --port 8080 \
 
 `Dockerfile.demo` builds a dedicated image for this — deliberately separate
 from the main `Dockerfile`, so the public-facing process can never accidentally
-ship with the dashboard's config-editing surface reachable.
+ship with the dashboard's config-editing surface reachable. This is the
+self-host path (Fly, a VPS, any container host).
+
+**Deploying to Vercel** is the other option, and needs no separate Dockerfile:
+`cmd/server/main.go` is a second, minimal entrypoint that builds the exact
+same `internal/demo.Server` from environment variables instead of flags
+(`DATABASE_URL`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `PORT`) —
+Vercel's Go Framework Preset auto-detects it, so `vercel.json` only needs
+`"framework": "go"`. Point `DATABASE_URL` at Neon and it's the same
+Postgres-backed logging/rate-limiting as the self-hosted command, just on a
+platform that doesn't guarantee a warm process sticks around between
+requests (which is exactly why the rate limiter is a query against the log
+table rather than in-memory state — see above).
 
 ## Quick start
 
