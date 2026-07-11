@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/Estetika101/verdict/internal/checks"
 	"github.com/Estetika101/verdict/internal/config"
 	"github.com/Estetika101/verdict/internal/dashboard"
+	"github.com/Estetika101/verdict/internal/demo"
 	"github.com/Estetika101/verdict/internal/engine"
 	"github.com/Estetika101/verdict/internal/model"
 	"github.com/Estetika101/verdict/internal/plugin"
@@ -32,10 +34,60 @@ func run(args []string, stdout, stderr *os.File) int {
 	if len(args) > 0 && args[0] == "serve" {
 		return runServe(args[1:], stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "demo" {
+		return runDemo(args[1:], stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "audit" {
 		args = args[1:]
 	}
 	return runAudit(args, stdout, stderr)
+}
+
+// runDemo starts the public "try it live" scan server (internal/demo) — a
+// separate command from `serve`, deliberately: `serve` is the trusted local/
+// LAN dashboard over your own config and reports; `demo` is the unauthenticated
+// public endpoint for the marketing site, with its own hardened single-fetch
+// path, rate limiting, and optional Postgres logging. Never the same process
+// or code path as the config editor.
+func runDemo(args []string, stdout, stderr *os.File) int {
+	fs := flag.NewFlagSet("verdict demo", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	host := fs.String("host", "0.0.0.0", "bind address (0.0.0.0 by default — this command is meant to be public)")
+	port := fs.Int("port", 8080, "port")
+	dbURL := fs.String("database-url", os.Getenv("DATABASE_URL"), "Postgres connection string for scan logging (optional; defaults to $DATABASE_URL, logging disabled if empty)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	var store *demo.Store
+	if *dbURL != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		s, err := demo.OpenStore(ctx, *dbURL)
+		cancel()
+		if err != nil {
+			fmt.Fprintf(stderr, "verdict: demo: %v (continuing without scan logging)\n", err)
+		} else {
+			store = s
+			defer store.Close()
+			fmt.Fprintln(stdout, "verdict: scan logging enabled")
+		}
+	} else {
+		fmt.Fprintln(stdout, "verdict: no --database-url / $DATABASE_URL set — scan logging disabled")
+	}
+
+	srv, err := demo.NewServer(store)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	addr := fmt.Sprintf("%s:%d", *host, *port)
+	fmt.Fprintf(stdout, "verdict: public demo listening on http://%s\n", addr)
+	if err := http.ListenAndServe(addr, srv); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	return 0
 }
 
 // runOnce executes one full audit pass against cfg: filters built-in and

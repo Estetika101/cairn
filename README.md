@@ -30,6 +30,42 @@ single static Go binary, so it runs anywhere from a Raspberry Pi to a CI runner.
 > Still to come: accessibility / structured-data modules, Tier 2
 > (Chromium — Core Web Vitals + rendered a11y), `watch`/`init`, comment-preserving
 > config writes, local run-over-run diff, and multi-site concurrency.
+>
+> There's also now a **public demo mode** (`verdict demo`) — a separate,
+> unauthenticated "paste a URL, get an instant scan" endpoint for the marketing
+> site, intentionally not built on the same code path as the trusted local
+> dashboard. See "Public demo mode" below before exposing it anywhere.
+
+## Public demo mode
+
+`verdict demo` runs a single-page, rate-limited, SSRF-hardened scan endpoint
+meant for public/marketing use — genuinely different from `verdict serve`, not
+just a flag on it:
+
+- **One fetch, hardened at dial time, not just at URL-check time.** The
+  target's IP is validated both before connecting and again via a custom
+  `DialContext` at the moment a connection actually opens — closing the
+  DNS-rebinding gap where a hostname resolves to a public IP when checked and
+  a private one moments later. Every redirect hop is re-validated the same way.
+  Rejects loopback/private/link-local/multicast ranges (including the cloud
+  metadata address, `169.254.169.254`).
+- **No config editing, no Fetch capability for checks, no crawling.** Only
+  page-scoped checks run (filtered by `Meta().Scope`, not a hand-maintained ID
+  list), and the demo's `CheckContext.Fetch` always errors — nothing a check
+  does can trigger a second network call.
+- **Rate-limited** (5 scans/hour/IP by default) and **optionally logs to
+  Postgres** (`--database-url`, or `$DATABASE_URL`; a hashed IP, hostname, and
+  finding counts only — no scraped content, no plaintext IP) purely for
+  operator visibility into what's being scanned. Logging is disabled, not
+  fatal, if no database is configured.
+
+```sh
+verdict demo --port 8080 --database-url "postgres://…"
+```
+
+`Dockerfile.demo` builds a dedicated image for this — deliberately separate
+from the main `Dockerfile`, so the public-facing process can never accidentally
+ship with the dashboard's config-editing surface reachable.
 
 ## Quick start
 
