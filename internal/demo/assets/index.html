@@ -59,6 +59,7 @@
     <input type="text" id="urlInput" placeholder="example.com" autocomplete="off" required>
     <button type="submit" id="scanButton">Scan</button>
   </form>
+  <div id="turnstileWidget" style="margin-bottom: 12px;"></div>
   <p class="hint">Checks one page only. 5 scans/hour per visitor. Public sites only — no internal/private addresses.</p>
 
   <div id="status" hidden></div>
@@ -82,10 +83,45 @@
   var summaryEl = document.getElementById('summary');
   var rowsEl = document.getElementById('rows');
 
+  // Turnstile is entirely optional and server-driven: if /api/turnstile-sitekey
+  // returns an empty key, no script is loaded and no widget is shown — local/dev
+  // runs without Cloudflare configured behave exactly as if this code weren't
+  // here. The widget is rendered explicitly (turnstile.render), not via the
+  // auto-render class="cf-turnstile" markup, because the site key is only known
+  // after an async fetch, not at page-load time.
+  var turnstileActive = false;
+  var turnstileToken = '';
+
+  fetch('/api/turnstile-sitekey')
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.sitekey) return;
+      turnstileActive = true;
+      var script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      script.async = true;
+      script.defer = true;
+      script.onload = function () {
+        turnstile.render('#turnstileWidget', {
+          sitekey: data.sitekey,
+          callback: function (token) { turnstileToken = token; },
+          'expired-callback': function () { turnstileToken = ''; },
+        });
+      };
+      document.head.appendChild(script);
+    })
+    .catch(function () { /* Turnstile status check failed — fail open to no widget, not a broken page */ });
+
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var url = urlInput.value.trim();
     if (!url) return;
+    if (turnstileActive && !turnstileToken) {
+      statusEl.hidden = false;
+      statusEl.className = 'error';
+      statusEl.textContent = 'Please complete the verification check above.';
+      return;
+    }
 
     button.disabled = true;
     statusEl.hidden = false;
@@ -96,7 +132,7 @@
     fetch('/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: url }),
+      body: JSON.stringify({ url: url, turnstileToken: turnstileToken }),
     })
       .then(function (r) {
         if (!r.ok) return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });

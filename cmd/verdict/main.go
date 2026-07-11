@@ -55,6 +55,8 @@ func runDemo(args []string, stdout, stderr *os.File) int {
 	host := fs.String("host", "0.0.0.0", "bind address (0.0.0.0 by default — this command is meant to be public)")
 	port := fs.Int("port", 8080, "port")
 	dbURL := fs.String("database-url", os.Getenv("DATABASE_URL"), "Postgres connection string for scan logging (optional; defaults to $DATABASE_URL, logging disabled if empty)")
+	turnstileSiteKey := fs.String("turnstile-sitekey", os.Getenv("TURNSTILE_SITE_KEY"), "Cloudflare Turnstile site key (public; defaults to $TURNSTILE_SITE_KEY)")
+	turnstileSecretKey := fs.String("turnstile-secret", os.Getenv("TURNSTILE_SECRET_KEY"), "Cloudflare Turnstile secret key (private; defaults to $TURNSTILE_SECRET_KEY; verification is skipped entirely if either key is empty)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -75,7 +77,17 @@ func runDemo(args []string, stdout, stderr *os.File) int {
 		fmt.Fprintln(stdout, "verdict: no --database-url / $DATABASE_URL set — scan logging disabled")
 	}
 
-	srv, err := demo.NewServer(store)
+	if *turnstileSiteKey != "" && *turnstileSecretKey != "" {
+		fmt.Fprintln(stdout, "verdict: Cloudflare Turnstile human verification enabled")
+	} else {
+		fmt.Fprintln(stdout, "verdict: no Turnstile site+secret key set — human verification disabled")
+	}
+
+	srv, err := demo.NewServer(demo.Options{
+		Store:              store,
+		TurnstileSiteKey:   *turnstileSiteKey,
+		TurnstileSecretKey: *turnstileSecretKey,
+	})
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2

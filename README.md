@@ -58,9 +58,18 @@ just a flag on it:
   finding counts only — no scraped content, no plaintext IP) purely for
   operator visibility into what's being scanned. Logging is disabled, not
   fatal, if no database is configured.
+- **Optional Cloudflare Turnstile human verification** (`--turnstile-sitekey`
+  / `--turnstile-secret`, or `$TURNSTILE_SITE_KEY` / `$TURNSTILE_SECRET_KEY`).
+  Off unless BOTH keys are set — a site key alone would render a widget
+  nothing actually checks. The widget loads dynamically (the frontend fetches
+  `/api/turnstile-sitekey` and only injects Cloudflare's script if a key comes
+  back), so a deploy without Turnstile configured behaves exactly as if this
+  feature didn't exist.
 
 ```sh
-verdict demo --port 8080 --database-url "postgres://…"
+verdict demo --port 8080 \
+  --database-url "postgres://…" \
+  --turnstile-sitekey "0x4..." --turnstile-secret "0x4..."
 ```
 
 `Dockerfile.demo` builds a dedicated image for this — deliberately separate

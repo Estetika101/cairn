@@ -29,17 +29,31 @@ const (
 	scanTimeout  = 15 * time.Second
 )
 
+// Options configures a Server. Store, TurnstileSiteKey, and
+// TurnstileSecretKey are all optional together: leave them zero to run
+// without logging and without human verification (e.g. local dev). Turnstile
+// is on only when BOTH the site key (public, sent to the browser) and the
+// secret key (private, used server-side) are set — a site key alone would
+// render a widget nothing actually checks.
+type Options struct {
+	Store              *Store
+	TurnstileSiteKey   string
+	TurnstileSecretKey string
+}
+
 // Server is the public demo endpoint: one visitor-submitted URL in, one
 // hardened fetch, a fixed set of page-scoped checks, a logged result out.
 type Server struct {
-	limiter *rateLimiter
-	store   *Store // nil disables logging (e.g. local dev with no DATABASE_URL)
-	checks  []model.Check
-	mux     *http.ServeMux
+	limiter   *rateLimiter
+	store     *Store // nil disables logging (e.g. local dev with no DATABASE_URL)
+	checks    []model.Check
+	mux       *http.ServeMux
+	siteKey   string
+	secretKey string // "" disables Turnstile verification entirely
 }
 
-// NewServer builds the demo server. store may be nil to run without logging.
-func NewServer(store *Store) (*Server, error) {
+// NewServer builds the demo server.
+func NewServer(opts Options) (*Server, error) {
 	sub, err := fs.Sub(assetsFS, "assets")
 	if err != nil {
 		return nil, fmt.Errorf("demo: %w", err)
@@ -61,16 +75,33 @@ func NewServer(store *Store) (*Server, error) {
 
 	s := &Server{
 		limiter: newRateLimiter(scansPerHour, time.Hour),
-		store:   store,
+		store:   opts.Store,
 		checks:  pageChecks,
 	}
+	// Both keys required, or neither counts — see the Options doc comment.
+	if opts.TurnstileSiteKey != "" && opts.TurnstileSecretKey != "" {
+		s.siteKey = opts.TurnstileSiteKey
+		s.secretKey = opts.TurnstileSecretKey
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.FS(sub)))
 	mux.HandleFunc("/api/scan", s.handleScan)
+	mux.HandleFunc("/api/turnstile-sitekey", s.handleSiteKey)
 	s.mux = mux
 
 	go s.sweepLoop()
 	return s, nil
+}
+
+// handleSiteKey exposes the PUBLIC site key only — never the secret — so the
+// frontend can render the Turnstile widget dynamically. Returns an empty
+// string when Turnstile isn't configured, and the frontend treats that as
+// "skip the widget entirely," matching the backend's own skip-when-unset
+// behavior in handleScan.
+func (s *Server) handleSiteKey(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(map[string]string{"sitekey": s.siteKey})
 }
 
 func allCandidateChecks() []model.Check {
@@ -106,7 +137,8 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		URL string `json:"url"`
+		URL            string `json:"url"`
+		TurnstileToken string `json:"turnstileToken"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -120,6 +152,22 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), scanTimeout)
 	defer cancel()
+
+	// Turnstile verification only runs when a secret key is configured
+	// (see Options' doc comment) — local/dev runs without one work exactly
+	// as before. A verification failure is reported to the visitor as
+	// exactly that, not folded into the generic scan-failure path.
+	if s.secretKey != "" {
+		human, verr := verifyTurnstile(ctx, s.secretKey, body.TurnstileToken, ip)
+		if verr != nil {
+			http.Error(w, "verification check failed — please try again", http.StatusBadGateway)
+			return
+		}
+		if !human {
+			http.Error(w, "please complete the human verification and try again", http.StatusForbidden)
+			return
+		}
+	}
 
 	pd, err := safeFetch(ctx, target)
 	if err != nil {
